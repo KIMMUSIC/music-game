@@ -1,0 +1,598 @@
+openapi: 3.0.3
+info:
+  title: Quiz Service API
+  description: Quiz set and question management
+  version: 1.0.0
+
+servers:
+  - url: /quiz
+    description: Quiz service routes
+
+paths:
+  /quizzes:
+    get:
+      summary: List quiz sets
+      operationId: listQuizzes
+      tags: [Quiz]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: visibility
+          in: query
+          schema:
+            type: string
+            enum: [public, private, mine]
+            default: public
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated quiz list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    post:
+      summary: Create a new quiz set
+      operationId: createQuiz
+      tags: [Quiz]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuizRequest'
+      responses:
+        '201':
+          description: Quiz created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quiz'
+        '400':
+          description: Invalid input
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /quizzes/{quizId}:
+    get:
+      summary: Get quiz details
+      operationId: getQuiz
+      tags: [Quiz]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Quiz details with questions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizWithQuestions'
+        '403':
+          description: Not authorized to view this quiz
+        '404':
+          description: Quiz not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    put:
+      summary: Update quiz set
+      operationId: updateQuiz
+      tags: [Quiz]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateQuizRequest'
+      responses:
+        '200':
+          description: Quiz updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Quiz'
+        '403':
+          description: Not the owner
+        '404':
+          description: Quiz not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      summary: Delete quiz set
+      operationId: deleteQuiz
+      tags: [Quiz]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Quiz deleted
+        '403':
+          description: Not the owner
+        '404':
+          description: Quiz not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /quizzes/{quizId}/questions:
+    post:
+      summary: Add question to quiz
+      operationId: addQuestion
+      tags: [Question]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateQuestionRequest'
+      responses:
+        '201':
+          description: Question added
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '400':
+          description: Invalid input
+        '403':
+          description: Not the owner
+        '404':
+          description: Quiz not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /quizzes/{quizId}/questions/{questionId}:
+    put:
+      summary: Update question
+      operationId: updateQuestion
+      tags: [Question]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateQuestionRequest'
+      responses:
+        '200':
+          description: Question updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Question'
+        '403':
+          description: Not the owner
+        '404':
+          description: Question not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+    delete:
+      summary: Delete question
+      operationId: deleteQuestion
+      tags: [Question]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: questionId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Question deleted
+        '403':
+          description: Not the owner
+        '404':
+          description: Question not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /quizzes/{quizId}/questions/reorder:
+    put:
+      summary: Reorder questions
+      operationId: reorderQuestions
+      tags: [Question]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [questionIds]
+              properties:
+                questionIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        '200':
+          description: Questions reordered
+        '400':
+          description: Invalid question IDs
+        '403':
+          description: Not the owner
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /upload/presigned-url:
+    post:
+      summary: Get presigned URL for MP3 upload
+      operationId: getUploadUrl
+      tags: [Upload]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, contentType]
+              properties:
+                filename:
+                  type: string
+                contentType:
+                  type: string
+                  enum: [audio/mpeg]
+                fileSize:
+                  type: integer
+                  maximum: 10485760
+                  description: Max 10MB
+      responses:
+        '200':
+          description: Presigned URL for upload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  uploadUrl:
+                    type: string
+                  s3Key:
+                    type: string
+                  expiresIn:
+                    type: integer
+                    description: Seconds until URL expires
+        '400':
+          description: Invalid file type or size
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /internal/quizzes/{quizId}:
+    get:
+      summary: Get quiz for game service (internal)
+      operationId: getQuizInternal
+      tags: [Internal]
+      security:
+        - internalAuth: []
+      parameters:
+        - name: quizId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Quiz with questions for gameplay
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizForGame'
+        '404':
+          description: Quiz not found
+
+components:
+  schemas:
+    Quiz:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        visibility:
+          type: string
+          enum: [public, private, friends]
+        questionCount:
+          type: integer
+        playCount:
+          type: integer
+        creatorId:
+          type: string
+          format: uuid
+        creatorNickname:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    QuizWithQuestions:
+      allOf:
+        - $ref: '#/components/schemas/Quiz'
+        - type: object
+          properties:
+            questions:
+              type: array
+              items:
+                $ref: '#/components/schemas/Question'
+
+    QuizForGame:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuestionForGame'
+
+    QuestionForGame:
+      type: object
+      properties:
+        index:
+          type: integer
+        audioType:
+          type: string
+          enum: [youtube, mp3]
+        audioSource:
+          type: string
+        startTimeMs:
+          type: integer
+        endTimeMs:
+          type: integer
+        timeLimitSec:
+          type: integer
+        answers:
+          $ref: '#/components/schemas/Answers'
+
+    Question:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        orderIndex:
+          type: integer
+        audioType:
+          type: string
+          enum: [youtube, mp3]
+        audioSource:
+          type: string
+        startTimeMs:
+          type: integer
+        endTimeMs:
+          type: integer
+        timeLimitSec:
+          type: integer
+        answers:
+          $ref: '#/components/schemas/Answers'
+        hint:
+          type: string
+          nullable: true
+
+    Answers:
+      type: object
+      properties:
+        primary:
+          type: string
+        alternatives:
+          type: array
+          items:
+            type: string
+
+    CreateQuizRequest:
+      type: object
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        visibility:
+          type: string
+          enum: [public, private, friends]
+          default: public
+
+    UpdateQuizRequest:
+      type: object
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          maxLength: 500
+        visibility:
+          type: string
+          enum: [public, private, friends]
+
+    CreateQuestionRequest:
+      type: object
+      required: [audioType, audioSource, startTimeMs, endTimeMs, answers]
+      properties:
+        audioType:
+          type: string
+          enum: [youtube, mp3]
+        audioSource:
+          type: string
+        startTimeMs:
+          type: integer
+          minimum: 0
+        endTimeMs:
+          type: integer
+          minimum: 1
+        timeLimitSec:
+          type: integer
+          minimum: 5
+          maximum: 120
+          default: 30
+        answers:
+          $ref: '#/components/schemas/Answers'
+        hint:
+          type: string
+          maxLength: 200
+
+    UpdateQuestionRequest:
+      type: object
+      properties:
+        audioType:
+          type: string
+          enum: [youtube, mp3]
+        audioSource:
+          type: string
+        startTimeMs:
+          type: integer
+          minimum: 0
+        endTimeMs:
+          type: integer
+          minimum: 1
+        timeLimitSec:
+          type: integer
+          minimum: 5
+          maximum: 120
+        answers:
+          $ref: '#/components/schemas/Answers'
+        hint:
+          type: string
+          maxLength: 200
+
+    QuizListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/Quiz'
+        pagination:
+          type: object
+          properties:
+            page:
+              type: integer
+            limit:
+              type: integer
+            total:
+              type: integer
+            totalPages:
+              type: integer
+
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Unauthorized"
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+
+    internalAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Key

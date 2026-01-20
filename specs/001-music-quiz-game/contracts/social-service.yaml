@@ -1,0 +1,447 @@
+openapi: 3.0.3
+info:
+  title: Social Service API
+  description: Friend management and presence tracking
+  version: 1.0.0
+
+servers:
+  - url: /social
+    description: Social service routes
+
+paths:
+  /friends:
+    get:
+      summary: Get friends list
+      operationId: getFriends
+      tags: [Friends]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [accepted, pending_sent, pending_received]
+            default: accepted
+      responses:
+        '200':
+          description: Friends list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Friend'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/request:
+    post:
+      summary: Send friend request
+      operationId: sendFriendRequest
+      tags: [Friends]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+                  format: uuid
+      responses:
+        '201':
+          description: Friend request sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendRelationship'
+        '400':
+          description: Invalid request (already friends, self-request, etc.)
+        '404':
+          description: User not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/request/{relationshipId}/accept:
+    post:
+      summary: Accept friend request
+      operationId: acceptFriendRequest
+      tags: [Friends]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: relationshipId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Friend request accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FriendRelationship'
+        '400':
+          description: Cannot accept (not pending, not the recipient)
+        '404':
+          description: Request not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/request/{relationshipId}/decline:
+    post:
+      summary: Decline friend request
+      operationId: declineFriendRequest
+      tags: [Friends]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: relationshipId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Friend request declined
+        '400':
+          description: Cannot decline (not pending, not the recipient)
+        '404':
+          description: Request not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/{friendId}:
+    delete:
+      summary: Remove friend
+      operationId: removeFriend
+      tags: [Friends]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: friendId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Friend removed
+        '404':
+          description: Not friends with this user
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/{friendId}/block:
+    post:
+      summary: Block user
+      operationId: blockUser
+      tags: [Friends]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: friendId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User blocked
+        '400':
+          description: Cannot block self
+        '404':
+          description: User not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/blocked:
+    get:
+      summary: Get blocked users list
+      operationId: getBlockedUsers
+      tags: [Friends]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Blocked users list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BlockedUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /friends/{userId}/unblock:
+    post:
+      summary: Unblock user
+      operationId: unblockUser
+      tags: [Friends]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User unblocked
+        '404':
+          description: User not blocked
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /presence:
+    get:
+      summary: Get presence status for multiple users
+      operationId: getPresence
+      tags: [Presence]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: userIds
+          in: query
+          required: true
+          schema:
+            type: array
+            items:
+              type: string
+              format: uuid
+          style: form
+          explode: false
+      responses:
+        '200':
+          description: Presence status
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/PresenceStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications:
+    get:
+      summary: Get notifications
+      operationId: getNotifications
+      tags: [Notifications]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: unreadOnly
+          in: query
+          schema:
+            type: boolean
+            default: false
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 20
+            maximum: 100
+      responses:
+        '200':
+          description: Notifications list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/{notificationId}/read:
+    post:
+      summary: Mark notification as read
+      operationId: markNotificationRead
+      tags: [Notifications]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notification marked as read
+        '404':
+          description: Notification not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/read-all:
+    post:
+      summary: Mark all notifications as read
+      operationId: markAllNotificationsRead
+      tags: [Notifications]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: All notifications marked as read
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /invites:
+    post:
+      summary: Send game invite to friends
+      operationId: sendGameInvite
+      tags: [Invites]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [friendIds, roomCode]
+              properties:
+                friendIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+                  minItems: 1
+                  maxItems: 19
+                roomCode:
+                  type: string
+                  pattern: '^[A-Z0-9]{6}$'
+      responses:
+        '200':
+          description: Invites sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  sent:
+                    type: integer
+                  failed:
+                    type: integer
+        '400':
+          description: Invalid input
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  schemas:
+    Friend:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/PresenceStatus'
+        friendsSince:
+          type: string
+          format: date-time
+
+    FriendRelationship:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        requesterId:
+          type: string
+          format: uuid
+        recipientId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [pending, accepted, declined, blocked]
+        createdAt:
+          type: string
+          format: date-time
+
+    BlockedUser:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        blockedAt:
+          type: string
+          format: date-time
+
+    PresenceStatus:
+      type: object
+      properties:
+        online:
+          type: boolean
+        inGame:
+          type: boolean
+        roomCode:
+          type: string
+          nullable: true
+          description: Room code if in game
+        lastSeen:
+          type: string
+          format: date-time
+          nullable: true
+
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [friend_request, friend_accepted, game_invite]
+        data:
+          type: object
+          additionalProperties: true
+        read:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Unauthorized"
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token

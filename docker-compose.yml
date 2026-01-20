@@ -1,0 +1,195 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: musicquiz-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-music_quiz}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - musicquiz-network
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: musicquiz-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - musicquiz-network
+
+  # Auth Service
+  auth:
+    build:
+      context: .
+      dockerfile: backend/services/auth/Dockerfile
+    container_name: musicquiz-auth
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3001
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-music_quiz}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      GOOGLE_CALLBACK_URL: ${GOOGLE_CALLBACK_URL:-http://localhost/api/auth/google/callback}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-api-key}
+    ports:
+      - "3001:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - musicquiz-network
+    restart: unless-stopped
+
+  # Quiz Service
+  quiz:
+    build:
+      context: .
+      dockerfile: backend/services/quiz/Dockerfile
+    container_name: musicquiz-quiz
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3002
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-music_quiz}
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      AUTH_SERVICE_URL: http://auth:3001
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-api-key}
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    networks:
+      - musicquiz-network
+    restart: unless-stopped
+
+  # Game Service
+  game:
+    build:
+      context: .
+      dockerfile: backend/services/game/Dockerfile
+    container_name: musicquiz-game
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3003
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-music_quiz}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      AUTH_SERVICE_URL: http://auth:3001
+      QUIZ_SERVICE_URL: http://quiz:3002
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-api-key}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth:
+        condition: service_started
+      quiz:
+        condition: service_started
+    networks:
+      - musicquiz-network
+    restart: unless-stopped
+
+  # Social Service
+  social:
+    build:
+      context: .
+      dockerfile: backend/services/social/Dockerfile
+    container_name: musicquiz-social
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3004
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      DB_NAME: ${POSTGRES_DB:-music_quiz}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      AUTH_SERVICE_URL: http://auth:3001
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-internal-api-key}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost}
+    ports:
+      - "3004:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      auth:
+        condition: service_started
+    networks:
+      - musicquiz-network
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost}
+        VITE_GAME_SERVICE_URL: ${VITE_GAME_SERVICE_URL:-http://localhost:3003}
+        VITE_SOCIAL_SERVICE_URL: ${VITE_SOCIAL_SERVICE_URL:-http://localhost:3004}
+    container_name: musicquiz-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - auth
+      - quiz
+      - game
+      - social
+    networks:
+      - musicquiz-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  musicquiz-network:
+    driver: bridge

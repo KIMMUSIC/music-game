@@ -1,0 +1,269 @@
+openapi: 3.0.3
+info:
+  title: Auth Service API
+  description: OAuth2 authentication and user management
+  version: 1.0.0
+
+servers:
+  - url: /auth
+    description: Auth service routes
+
+paths:
+  /google:
+    get:
+      summary: Initiate Google OAuth login
+      operationId: googleLogin
+      tags: [OAuth]
+      responses:
+        '302':
+          description: Redirect to Google OAuth consent
+
+  /google/callback:
+    get:
+      summary: Google OAuth callback
+      operationId: googleCallback
+      tags: [OAuth]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with session cookie
+
+  /kakao:
+    get:
+      summary: Initiate Kakao OAuth login
+      operationId: kakaoLogin
+      tags: [OAuth]
+      responses:
+        '302':
+          description: Redirect to Kakao OAuth consent
+
+  /kakao/callback:
+    get:
+      summary: Kakao OAuth callback
+      operationId: kakaoCallback
+      tags: [OAuth]
+      parameters:
+        - name: code
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '302':
+          description: Redirect to frontend with session cookie
+
+  /logout:
+    post:
+      summary: Logout current session
+      operationId: logout
+      tags: [Session]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Successfully logged out
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /me:
+    get:
+      summary: Get current user profile
+      operationId: getCurrentUser
+      tags: [User]
+      security:
+        - cookieAuth: []
+      responses:
+        '200':
+          description: Current user data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /me/nickname:
+    put:
+      summary: Update nickname
+      operationId: updateNickname
+      tags: [User]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [nickname]
+              properties:
+                nickname:
+                  type: string
+                  minLength: 2
+                  maxLength: 20
+                  pattern: '^[a-zA-Z0-9_가-힣]+$'
+      responses:
+        '200':
+          description: Nickname updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid nickname format
+        '409':
+          description: Nickname already taken
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/{userId}:
+    get:
+      summary: Get user by ID
+      operationId: getUserById
+      tags: [User]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: User data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserPublic'
+        '404':
+          description: User not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/search:
+    get:
+      summary: Search users by nickname
+      operationId: searchUsers
+      tags: [User]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          schema:
+            type: string
+            minLength: 2
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 10
+            maximum: 50
+      responses:
+        '200':
+          description: Matching users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserPublic'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /internal/validate-token:
+    post:
+      summary: Validate JWT token (internal)
+      operationId: validateToken
+      tags: [Internal]
+      security:
+        - internalAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Token validation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid:
+                    type: boolean
+                  userId:
+                    type: string
+                    format: uuid
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        email:
+          type: string
+          nullable: true
+        avatarUrl:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        needsNickname:
+          type: boolean
+          description: True if user hasn't set nickname yet
+
+    UserPublic:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Unauthorized"
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+
+    internalAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Key

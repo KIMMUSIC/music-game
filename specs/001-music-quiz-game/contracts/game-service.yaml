@@ -1,0 +1,400 @@
+openapi: 3.0.3
+info:
+  title: Game Service API
+  description: Game room management and real-time gameplay
+  version: 1.0.0
+
+servers:
+  - url: /game
+    description: Game service routes
+
+paths:
+  /rooms:
+    post:
+      summary: Create a new game room
+      operationId: createRoom
+      tags: [Room]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoomRequest'
+      responses:
+        '201':
+          description: Room created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+        '400':
+          description: Invalid input
+        '404':
+          description: Quiz not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /rooms/{roomCode}:
+    get:
+      summary: Get room details
+      operationId: getRoom
+      tags: [Room]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: roomCode
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z0-9]{6}$'
+      responses:
+        '200':
+          description: Room details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoomDetails'
+        '404':
+          description: Room not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /rooms/{roomCode}/join:
+    post:
+      summary: Join a game room
+      operationId: joinRoom
+      tags: [Room]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: roomCode
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z0-9]{6}$'
+      responses:
+        '200':
+          description: Successfully joined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JoinRoomResponse'
+        '400':
+          description: Cannot join (room full, game started, etc.)
+        '404':
+          description: Room not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /rooms/{roomCode}/leave:
+    post:
+      summary: Leave a game room
+      operationId: leaveRoom
+      tags: [Room]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: roomCode
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z0-9]{6}$'
+      responses:
+        '200':
+          description: Successfully left
+        '404':
+          description: Room not found or not a participant
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /rooms/{roomCode}/start:
+    post:
+      summary: Start the game (host only)
+      operationId: startGame
+      tags: [Game]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: roomCode
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z0-9]{6}$'
+      responses:
+        '200':
+          description: Game started
+        '400':
+          description: Cannot start (not enough players, game already started)
+        '403':
+          description: Not the host
+        '404':
+          description: Room not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /rooms/{roomCode}/results:
+    get:
+      summary: Get game results
+      operationId: getResults
+      tags: [Game]
+      security:
+        - cookieAuth: []
+      parameters:
+        - name: roomCode
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[A-Z0-9]{6}$'
+      responses:
+        '200':
+          description: Game results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GameResults'
+        '400':
+          description: Game not finished
+        '404':
+          description: Room not found
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  schemas:
+    CreateRoomRequest:
+      type: object
+      required: [quizId]
+      properties:
+        quizId:
+          type: string
+          format: uuid
+        maxPlayers:
+          type: integer
+          minimum: 2
+          maximum: 20
+          default: 10
+        settings:
+          $ref: '#/components/schemas/RoomSettings'
+
+    RoomSettings:
+      type: object
+      properties:
+        allowLateJoin:
+          type: boolean
+          default: false
+        showLeaderboardDuringGame:
+          type: boolean
+          default: true
+        questionTimeLimit:
+          type: integer
+          minimum: 5
+          maximum: 120
+          default: 30
+
+    Room:
+      type: object
+      properties:
+        roomCode:
+          type: string
+        inviteLink:
+          type: string
+        hostId:
+          type: string
+          format: uuid
+        quizId:
+          type: string
+          format: uuid
+        quizTitle:
+          type: string
+        status:
+          type: string
+          enum: [lobby, playing, finished]
+        maxPlayers:
+          type: integer
+        playerCount:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    RoomDetails:
+      allOf:
+        - $ref: '#/components/schemas/Room'
+        - type: object
+          properties:
+            players:
+              type: array
+              items:
+                $ref: '#/components/schemas/Player'
+            settings:
+              $ref: '#/components/schemas/RoomSettings'
+            currentQuestion:
+              type: integer
+              description: -1 if not started
+            totalQuestions:
+              type: integer
+
+    Player:
+      type: object
+      properties:
+        userId:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        score:
+          type: integer
+        isHost:
+          type: boolean
+        isActive:
+          type: boolean
+
+    JoinRoomResponse:
+      type: object
+      properties:
+        room:
+          $ref: '#/components/schemas/RoomDetails'
+        wsToken:
+          type: string
+          description: Token for WebSocket connection
+
+    GameResults:
+      type: object
+      properties:
+        roomCode:
+          type: string
+        quizTitle:
+          type: string
+        totalQuestions:
+          type: integer
+        rankings:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlayerResult'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+
+    PlayerResult:
+      type: object
+      properties:
+        rank:
+          type: integer
+        userId:
+          type: string
+          format: uuid
+        nickname:
+          type: string
+        avatarUrl:
+          type: string
+          nullable: true
+        totalScore:
+          type: integer
+        correctAnswers:
+          type: integer
+        averageResponseTimeMs:
+          type: integer
+
+  responses:
+    Unauthorized:
+      description: Not authenticated
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+                example: "Unauthorized"
+
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+
+---
+# WebSocket Events (Socket.IO)
+
+# Client -> Server Events:
+#
+# room:join
+#   Payload: { roomCode: string, wsToken: string }
+#   Response: room:state or error
+#
+# answer:submit
+#   Payload: { answer: string, timestamp: number }
+#   Response: answer:result
+#
+# room:leave
+#   Payload: {}
+#   Response: (none, just disconnects from room)
+
+# Server -> Client Events:
+#
+# room:state
+#   Payload: {
+#     status: 'lobby' | 'playing' | 'finished',
+#     players: Player[],
+#     currentQuestion: number,
+#     totalQuestions: number
+#   }
+#
+# player:joined
+#   Payload: { player: Player }
+#
+# player:left
+#   Payload: { userId: string }
+#
+# game:start
+#   Payload: {
+#     questionIndex: number,
+#     audioType: 'youtube' | 'mp3',
+#     audioSource: string,
+#     startTimeMs: number,
+#     endTimeMs: number,
+#     timeLimitSec: number,
+#     serverTime: number
+#   }
+#
+# answer:result
+#   Payload: {
+#     correct: boolean,
+#     points: number,
+#     correctAnswer: string (only if incorrect or time expired)
+#   }
+#
+# score:update
+#   Payload: {
+#     userId: string,
+#     score: number,
+#     correct: boolean
+#   }
+#
+# question:end
+#   Payload: {
+#     questionIndex: number,
+#     correctAnswer: string,
+#     playerAnswers: { userId: string, answer: string, correct: boolean, points: number }[]
+#   }
+#
+# game:end
+#   Payload: {
+#     rankings: PlayerResult[]
+#   }
+#
+# error
+#   Payload: { code: string, message: string }

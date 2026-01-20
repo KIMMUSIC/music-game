@@ -1,0 +1,187 @@
+name: CD
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - 'v*'
+
+env:
+  AWS_REGION: ap-northeast-2
+  ECR_REGISTRY: ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.ap-northeast-2.amazonaws.com
+
+jobs:
+  build-and-push:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image-tag: ${{ steps.meta.outputs.version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            echo "version=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "version=sha-${GITHUB_SHA::8}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Auth Service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/services/auth/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/musicquiz-auth:${{ steps.meta.outputs.version }}
+            ${{ env.ECR_REGISTRY }}/musicquiz-auth:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Quiz Service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/services/quiz/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/musicquiz-quiz:${{ steps.meta.outputs.version }}
+            ${{ env.ECR_REGISTRY }}/musicquiz-quiz:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Game Service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/services/game/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/musicquiz-game:${{ steps.meta.outputs.version }}
+            ${{ env.ECR_REGISTRY }}/musicquiz-game:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Social Service
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: backend/services/social/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/musicquiz-social:${{ steps.meta.outputs.version }}
+            ${{ env.ECR_REGISTRY }}/musicquiz-social:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push Frontend
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: frontend/Dockerfile
+          push: true
+          tags: |
+            ${{ env.ECR_REGISTRY }}/musicquiz-frontend:${{ steps.meta.outputs.version }}
+            ${{ env.ECR_REGISTRY }}/musicquiz-frontend:latest
+          build-args: |
+            VITE_API_BASE_URL=${{ secrets.FRONTEND_URL }}
+            VITE_GAME_SERVICE_URL=${{ secrets.GAME_SERVICE_URL }}
+            VITE_SOCIAL_SERVICE_URL=${{ secrets.SOCIAL_SERVICE_URL }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: staging
+      url: https://staging.musicquiz.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update ECS services
+        run: |
+          # Update each service with new image
+          for service in auth quiz game social frontend; do
+            aws ecs update-service \
+              --cluster musicquiz-staging \
+              --service musicquiz-staging-$service \
+              --force-new-deployment
+          done
+
+      - name: Wait for deployment
+        run: |
+          for service in auth quiz game social frontend; do
+            aws ecs wait services-stable \
+              --cluster musicquiz-staging \
+              --services musicquiz-staging-$service
+          done
+
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment:
+      name: production
+      url: https://musicquiz.example.com
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Update ECS services
+        run: |
+          # Update each service with new image
+          for service in auth quiz game social frontend; do
+            aws ecs update-service \
+              --cluster musicquiz-prod \
+              --service musicquiz-prod-$service \
+              --force-new-deployment
+          done
+
+      - name: Wait for deployment
+        run: |
+          for service in auth quiz game social frontend; do
+            aws ecs wait services-stable \
+              --cluster musicquiz-prod \
+              --services musicquiz-prod-$service
+          done
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          generate_release_notes: true
