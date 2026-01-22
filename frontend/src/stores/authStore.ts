@@ -23,6 +23,7 @@ interface AuthState {
   updateNickname: (nickname: string) => void;
   fetchUser: () => Promise<void>;
   fetchUserWithToken: (token: string) => Promise<void>;
+  guestLogin: (nickname: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -137,6 +138,47 @@ export const useAuthStore = create<AuthState>()(
             error: 'Failed to authenticate',
             token: null,
           });
+        }
+      },
+
+      guestLogin: async (nickname: string) => {
+        try {
+          set({ isLoading: true, error: null });
+
+          const response = await fetch('/auth/guest/login', {
+            method: 'POST',
+            credentials: 'include',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ nickname }),
+          });
+
+          const data = await response.json();
+
+          if (response.ok) {
+            set({
+              user: { ...data.user, needsNickname: false },
+              isAuthenticated: true,
+              isLoading: false,
+              error: null,
+              token: data.token,
+            });
+            return { success: true };
+          } else {
+            set({
+              isLoading: false,
+              error: data.error || 'Guest login failed',
+            });
+            return { success: false, error: data.error || 'Guest login failed' };
+          }
+        } catch (error) {
+          console.error('Guest login failed:', error);
+          set({
+            isLoading: false,
+            error: 'Failed to login as guest',
+          });
+          return { success: false, error: 'Failed to login as guest' };
         }
       },
     }),

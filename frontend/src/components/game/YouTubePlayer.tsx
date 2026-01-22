@@ -41,6 +41,12 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
     const configRef = useRef({ startTime, previewDuration, volume, autoPlay });
     configRef.current = { startTime, previewDuration, volume, autoPlay };
 
+    // Store callbacks in refs to avoid recreating player on callback changes
+    const onReadyRef = useRef(onReady);
+    const onErrorRef = useRef(onError);
+    onReadyRef.current = onReady;
+    onErrorRef.current = onError;
+
     useImperativeHandle(ref, () => ({
       play: () => playerRef.current?.playVideo(),
       pause: () => playerRef.current?.pauseVideo(),
@@ -112,29 +118,32 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
               }
 
               setIsReady(true);
-              onReady?.();
+              onReadyRef.current?.();
 
-              // Setup looping - check every 500ms
+              // Setup looping - check every 250ms for more responsive looping
               loopInterval = setInterval(() => {
                 if (isDestroyed || !playerRef.current) return;
 
                 try {
                   const currentTime = playerRef.current.getCurrentTime();
-                  const { startTime: loopStart, previewDuration: loopDuration } = configRef.current;
+                  const { startTime: loopStart, previewDuration: loopDuration, autoPlay: shouldPlay } = configRef.current;
                   const endTime = loopStart + loopDuration;
 
-                  // If past end time, loop back to start
-                  if (currentTime >= endTime) {
+                  // If past end time or before start time, loop back to start
+                  if (currentTime >= endTime || currentTime < loopStart - 1) {
                     playerRef.current.seekTo(loopStart, true);
+                    if (shouldPlay) {
+                      playerRef.current.playVideo();
+                    }
                   }
                 } catch {
                   // Ignore errors
                 }
-              }, 500);
+              }, 250);
             },
             onError: (event) => {
               console.error('YouTube player error:', event);
-              onError?.();
+              onErrorRef.current?.();
             },
             onStateChange: (event) => {
               // YT.PlayerState: UNSTARTED=-1, ENDED=0, PLAYING=1, PAUSED=2, BUFFERING=3, CUED=5
@@ -143,6 +152,23 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
                 const { startTime: loopStart } = configRef.current;
                 playerRef.current?.seekTo(loopStart, true);
                 playerRef.current?.playVideo();
+              } else if (event.data === 2 && configRef.current.autoPlay) {
+                // Video was paused but we want it playing - resume after short delay
+                // This helps recover from browser pausing the video (e.g., tab switch)
+                setTimeout(() => {
+                  if (!isDestroyed && playerRef.current) {
+                    playerRef.current.playVideo();
+                  }
+                }, 100);
+              } else if (event.data === -1 && configRef.current.autoPlay) {
+                // Video is unstarted - try to play
+                setTimeout(() => {
+                  if (!isDestroyed && playerRef.current) {
+                    const { startTime: loopStart } = configRef.current;
+                    playerRef.current.seekTo(loopStart, true);
+                    playerRef.current.playVideo();
+                  }
+                }, 100);
               }
             },
           },
@@ -185,14 +211,30 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
         playerRef.current = null;
         setIsReady(false);
       };
-    }, [videoId, onReady, onError]);
+    // Note: onReady and onError are stored in refs to prevent player recreation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [videoId]);
 
     // Handle tab visibility - resume playback when tab becomes visible
     useEffect(() => {
       const handleVisibility = () => {
         if (document.visibilityState === 'visible' && playerRef.current && isReady) {
-          // Resume playback when tab becomes visible
-          playerRef.current.playVideo();
+          try {
+            const { startTime: loopStart, previewDuration: loopDuration } = configRef.current;
+            const endTime = loopStart + loopDuration;
+            const currentTime = playerRef.current.getCurrentTime();
+
+            // If current time is outside the valid range, seek back to start
+            if (currentTime < loopStart || currentTime >= endTime) {
+              playerRef.current.seekTo(loopStart, true);
+            }
+
+            // Resume playback
+            playerRef.current.playVideo();
+          } catch {
+            // If we can't get current time, just try to play
+            playerRef.current?.playVideo();
+          }
         }
       };
 

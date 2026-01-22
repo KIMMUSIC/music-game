@@ -1,13 +1,39 @@
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Card } from '../components/common/Card';
 import { Button } from '../components/common/Button';
+import { useAuthStore } from '../stores/authStore';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { guestLogin } = useAuthStore();
+  const [nickname, setNickname] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const handleGoogleLogin = () => {
     window.location.href = `${import.meta.env.VITE_API_URL || ''}/auth/google`;
   };
 
-  const handleKakaoLogin = () => {
-    window.location.href = `${import.meta.env.VITE_API_URL || ''}/auth/kakao`;
+  const handleGuestLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+
+    const trimmedNickname = nickname.trim();
+    if (trimmedNickname.length < 1 || trimmedNickname.length > 20) {
+      setError('닉네임은 1-20자 사이여야 합니다');
+      return;
+    }
+
+    setIsSubmitting(true);
+    const result = await guestLogin(trimmedNickname);
+    setIsSubmitting(false);
+
+    if (result.success) {
+      navigate('/');
+    } else {
+      setError(result.error || '로그인에 실패했습니다');
+    }
   };
 
   return (
@@ -20,7 +46,8 @@ const Login = () => {
           <p className="text-gray-600">Sign in to play with friends</p>
         </div>
 
-        <div className="space-y-4">
+        <div className="space-y-6">
+          {/* Google Login */}
           <Button
             onClick={handleGoogleLogin}
             variant="outline"
@@ -47,18 +74,43 @@ const Login = () => {
             Continue with Google
           </Button>
 
-          <Button
-            onClick={handleKakaoLogin}
-            className="w-full flex items-center justify-center gap-3 py-3 bg-yellow-400 hover:bg-yellow-500 text-black"
-          >
-            <svg className="w-5 h-5" viewBox="0 0 24 24">
-              <path
-                fill="currentColor"
-                d="M12 3C6.48 3 2 6.58 2 11c0 2.8 1.81 5.26 4.55 6.71-.19.67-.68 2.42-.78 2.8-.12.48.18.47.38.34.15-.1 2.4-1.63 3.38-2.29.49.07.99.11 1.5.11 5.52 0 10-3.58 10-8C22 6.58 17.52 3 12 3z"
-              />
-            </svg>
-            Continue with Kakao
-          </Button>
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <div className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">or</span>
+            </div>
+          </div>
+
+          {/* Guest Login Form */}
+          <div className="space-y-3">
+            <h2 className="text-lg font-semibold text-gray-700">게스트 로그인</h2>
+            <form onSubmit={handleGuestLogin} className="space-y-3">
+              <div>
+                <input
+                  type="text"
+                  value={nickname}
+                  onChange={(e) => setNickname(e.target.value)}
+                  placeholder="닉네임을 입력하세요"
+                  maxLength={20}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
+                  disabled={isSubmitting}
+                />
+              </div>
+              {error && (
+                <p className="text-red-500 text-sm">{error}</p>
+              )}
+              <Button
+                type="submit"
+                className="w-full py-3"
+                disabled={isSubmitting || !nickname.trim()}
+              >
+                {isSubmitting ? '접속 중...' : '게스트로 시작하기'}
+              </Button>
+            </form>
+          </div>
         </div>
 
         <p className="mt-8 text-sm text-gray-500">

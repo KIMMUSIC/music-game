@@ -18,10 +18,6 @@ export default defineConfig({
         target: 'http://localhost:3001',
         changeOrigin: true,
       },
-      '/auth/kakao': {
-        target: 'http://localhost:3001',
-        changeOrigin: true,
-      },
       // API routes - prefix with /api to avoid conflict with frontend routes
       '/api/auth': {
         target: 'http://localhost:3001',

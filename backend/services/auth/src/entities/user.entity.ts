@@ -7,7 +7,7 @@ import {
   Index,
 } from 'typeorm';
 
-export type OAuthProvider = 'google' | 'kakao';
+export type OAuthProvider = 'google' | 'kakao' | 'guest';
 
 @Entity('users')
 export class User {

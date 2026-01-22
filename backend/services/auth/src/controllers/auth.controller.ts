@@ -54,6 +54,64 @@ export class AuthController {
     return this.handleOAuthCallback(req, res);
   }
 
+  @Post('guest/login')
+  @HttpCode(HttpStatus.OK)
+  async guestLogin(
+    @Body('nickname') nickname: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    if (!nickname || nickname.trim().length === 0) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        error: 'Nickname is required',
+      });
+    }
+
+    try {
+      const user = await this.userService.createGuestUser(nickname);
+
+      const tokens = await this.authService.generateTokens(user, {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip,
+      });
+
+      this.setTokenCookies(res, tokens.accessToken, tokens.refreshToken);
+
+      return res.json({
+        token: tokens.accessToken,
+        user: {
+          id: user.id,
+          nickname: user.nickname,
+          avatarUrl: user.avatarUrl,
+        },
+      });
+    } catch (error) {
+      if (error instanceof Error && error.message.includes('already taken')) {
+        return res.status(HttpStatus.CONFLICT).json({
+          error: 'Nickname already taken',
+        });
+      }
+      throw error;
+    }
+  }
+
+  @Get('guest/check-nickname')
+  async checkNickname(@Req() req: Request, @Res() res: Response) {
+    const nickname = req.query.nickname as string;
+
+    if (!nickname || nickname.trim().length === 0) {
+      return res.status(HttpStatus.BAD_REQUEST).json({
+        error: 'Nickname is required',
+      });
+    }
+
+    const existingUser = await this.userService.findByNickname(nickname.trim());
+
+    return res.json({
+      available: !existingUser,
+    });
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   async getProfile(@Req() req: RequestWithUser) {

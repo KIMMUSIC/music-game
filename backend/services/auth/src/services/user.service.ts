@@ -2,9 +2,11 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { User } from '../entities/user.entity';
 import { OAuthProfile } from '../strategies/google.strategy';
 
@@ -59,6 +61,31 @@ export class UserService {
       email: profile.email,
       nickname,
       avatarUrl: profile.avatarUrl,
+      lastLoginAt: new Date(),
+    });
+
+    return this.userRepository.save(user);
+  }
+
+  async createGuestUser(nickname: string): Promise<User> {
+    // Validate nickname
+    const sanitizedNickname = nickname.trim();
+    if (sanitizedNickname.length < 1 || sanitizedNickname.length > 20) {
+      throw new BadRequestException('Nickname must be 1-20 characters');
+    }
+
+    // Check if nickname is already taken
+    const existingUser = await this.findByNickname(sanitizedNickname);
+    if (existingUser) {
+      throw new ConflictException('Nickname already taken');
+    }
+
+    const user = this.userRepository.create({
+      oauthProvider: 'guest',
+      oauthId: uuidv4(),
+      email: null,
+      nickname: sanitizedNickname,
+      avatarUrl: null,
       lastLoginAt: new Date(),
     });
 

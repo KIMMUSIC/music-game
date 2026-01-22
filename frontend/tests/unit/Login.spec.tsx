@@ -35,13 +35,6 @@ describe('Login', () => {
     expect(googleButton).toBeInTheDocument();
   });
 
-  it('should render Kakao login button', () => {
-    renderLogin();
-
-    const kakaoButton = screen.getByRole('button', { name: /kakao/i });
-    expect(kakaoButton).toBeInTheDocument();
-  });
-
   it('should redirect to Google OAuth on Google button click', () => {
     renderLogin();
 
@@ -49,15 +42,6 @@ describe('Login', () => {
     fireEvent.click(googleButton);
 
     expect(mockLocation.href).toContain('/auth/google');
-  });
-
-  it('should redirect to Kakao OAuth on Kakao button click', () => {
-    renderLogin();
-
-    const kakaoButton = screen.getByRole('button', { name: /kakao/i });
-    fireEvent.click(kakaoButton);
-
-    expect(mockLocation.href).toContain('/auth/kakao');
   });
 
   it('should display login description', () => {
