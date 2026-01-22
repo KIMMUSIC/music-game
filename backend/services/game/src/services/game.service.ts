@@ -52,7 +52,6 @@ export class GameService {
       answers: new Map(),
       roundResults: [],
       scores: new Map(room.players.map((p) => [p.id, 0])),
-      scoringMode: room.settings.scoringMode || 'all_correct',
       firstCorrectPlayerId: null,
       firstCorrectNickname: null,
       skipVotes: new Set(),
@@ -83,7 +82,6 @@ export class GameService {
     // Restore Set from array
     parsed.skipVotes = new Set(parsed.skipVotes || []);
     // Ensure new fields have defaults for backward compatibility
-    parsed.scoringMode = parsed.scoringMode || 'all_correct';
     parsed.firstCorrectPlayerId = parsed.firstCorrectPlayerId || null;
     parsed.firstCorrectNickname = parsed.firstCorrectNickname || null;
     parsed.skipVotingEnabled = parsed.skipVotingEnabled ?? false;
@@ -163,23 +161,8 @@ export class GameService {
     let isFirstCorrect = false;
 
     if (isCorrect) {
-      if (game.scoringMode === 'first_correct_only') {
-        // Only the first correct answer gets points
-        if (game.firstCorrectPlayerId === null) {
-          let baseAndBonus = this.basePoints + timeBonus;
-          // Apply hint penalty if hint was revealed
-          if (game.hintRevealed && game.hintPenaltyPercent > 0) {
-            const penaltyReduction = Math.floor(baseAndBonus * (game.hintPenaltyPercent / 100));
-            baseAndBonus = Math.max(baseAndBonus - penaltyReduction, 100); // Min 100 points
-          }
-          points = baseAndBonus;
-          game.firstCorrectPlayerId = playerId;
-          game.firstCorrectNickname = playerNickname;
-          isFirstCorrect = true;
-        }
-        // Subsequent correct answers get 0 points
-      } else {
-        // all_correct mode: everyone who answers correctly gets points
+      // First correct only: only the first correct answer gets points
+      if (game.firstCorrectPlayerId === null) {
         let baseAndBonus = this.basePoints + timeBonus;
         // Apply hint penalty if hint was revealed
         if (game.hintRevealed && game.hintPenaltyPercent > 0) {
@@ -187,7 +170,11 @@ export class GameService {
           baseAndBonus = Math.max(baseAndBonus - penaltyReduction, 100); // Min 100 points
         }
         points = baseAndBonus;
+        game.firstCorrectPlayerId = playerId;
+        game.firstCorrectNickname = playerNickname;
+        isFirstCorrect = true;
       }
+      // Subsequent correct answers get 0 points
     }
 
     const playerAnswer: PlayerAnswer = {

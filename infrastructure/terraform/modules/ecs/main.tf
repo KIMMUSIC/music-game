@@ -175,7 +175,7 @@ resource "aws_lb_listener_rule" "auth" {
 
   condition {
     path_pattern {
-      values = ["/api/auth/*", "/auth/*"]
+      values = ["/auth", "/auth/*"]
     }
   }
 }
@@ -191,7 +191,7 @@ resource "aws_lb_listener_rule" "quiz" {
 
   condition {
     path_pattern {
-      values = ["/api/quiz/*", "/quizzes/*"]
+      values = ["/quiz", "/quiz/*", "/uploads/*"]
     }
   }
 }
@@ -207,7 +207,7 @@ resource "aws_lb_listener_rule" "game" {
 
   condition {
     path_pattern {
-      values = ["/api/game/*", "/socket.io/*"]
+      values = ["/game", "/game/*", "/socket.io/*"]
     }
   }
 }
@@ -223,7 +223,7 @@ resource "aws_lb_listener_rule" "social" {
 
   condition {
     path_pattern {
-      values = ["/api/friends/*", "/friends/*"]
+      values = ["/friends", "/friends/*"]
     }
   }
 }

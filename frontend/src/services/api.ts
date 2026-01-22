@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse, AxiosError } from 'axios';
 
-// API base URL - use /api prefix to distinguish from frontend routes
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+// API base URL - empty string since ALB routes directly to services (e.g., /quiz/*, /auth/*, /game/*)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 export interface ApiError {
   statusCode: number;

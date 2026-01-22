@@ -48,7 +48,6 @@ export interface GameState {
   answers: Map<string, PlayerAnswer>;
   roundResults: RoundResult[];
   scores: Map<string, number>;
-  scoringMode: 'all_correct' | 'first_correct_only';
   firstCorrectPlayerId: string | null;
   firstCorrectNickname: string | null;
   skipVotes: Set<string>; // playerIds who voted to skip

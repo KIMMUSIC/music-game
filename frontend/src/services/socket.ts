@@ -1,6 +1,11 @@
 import { io, Socket } from 'socket.io-client';
 
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://localhost:3003';
+// In production, use relative URL to connect through ALB; in development use localhost
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || (
+  typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? ''
+    : 'http://localhost:3003'
+);
 
 export interface SocketEvents {
   // Room events
@@ -130,7 +135,8 @@ class SocketService {
     event: K,
     callback: (data: SocketEvents[K]) => void,
   ): void {
-    this.socket?.on(event, callback as (...args: unknown[]) => void);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    this.socket?.on(event, callback as any);
   }
 
   off<K extends keyof SocketEvents>(event: K): void {

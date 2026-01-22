@@ -11,6 +11,7 @@ import { User } from './entities/user.entity';
 // Controllers
 import { AuthController } from './controllers/auth.controller';
 import { InternalController } from './controllers/internal.controller';
+import { HealthController } from './controllers/health.controller';
 
 // Services
 import { AuthService } from './services/auth.service';
@@ -39,10 +40,14 @@ import { InternalGuard } from '../../../shared/guards/internal.guard';
         port: configService.get<number>('DB_PORT', 5432),
         username: configService.get<string>('DB_USERNAME', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', 'postgres'),
-        database: configService.get<string>('DB_NAME', 'music_game_auth'),
+        database: configService.get<string>('DB_NAME', 'musicquiz'),
         entities: [User],
-        synchronize: configService.get<string>('NODE_ENV') !== 'production',
+        synchronize: true, // Enable for initial deployment - disable after tables created
         logging: configService.get<string>('NODE_ENV') === 'development',
+        ssl:
+          configService.get<string>('NODE_ENV') === 'production'
+            ? { rejectUnauthorized: false }
+            : false,
       }),
       inject: [ConfigService],
     }),
@@ -59,7 +64,7 @@ import { InternalGuard } from '../../../shared/guards/internal.guard';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController, InternalController],
+  controllers: [HealthController, AuthController, InternalController],
   providers: [
     AuthService,
     UserService,

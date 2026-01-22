@@ -26,7 +26,24 @@ interface AuthenticatedSocket extends Socket {
 
 @WebSocketGateway({
   cors: {
-    origin: '*',
+    origin: (origin, callback) => {
+      // Allow requests with no origin (mobile apps, curl, etc.)
+      if (!origin) {
+        callback(null, true);
+        return;
+      }
+      // Allow localhost for development
+      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+        callback(null, true);
+        return;
+      }
+      // Allow production domain
+      if (origin.includes('musicquiz.cloud')) {
+        callback(null, true);
+        return;
+      }
+      callback(new Error('Not allowed by CORS'), false);
+    },
     credentials: true,
   },
   namespace: '/room',
@@ -50,10 +67,11 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       'AUTH_SERVICE_URL',
       'http://localhost:3001',
     );
-    this.internalApiKey = this.configService.get<string>(
-      'INTERNAL_API_KEY',
-      '',
-    );
+    const apiKey = this.configService.get<string>('INTERNAL_API_KEY');
+    if (!apiKey) {
+      console.warn('WARNING: INTERNAL_API_KEY is not set. Service-to-service authentication may fail.');
+    }
+    this.internalApiKey = apiKey || '';
   }
 
   async handleConnection(client: AuthenticatedSocket) {
@@ -428,7 +446,6 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
             timeLimit: game.currentSong.timeLimit,
           } : null,
           roundEndTime: game.roundEndTime,
-          scoringMode: game.scoringMode,
           someoneGotIt: game.firstCorrectPlayerId !== null,
         },
       };
@@ -884,23 +901,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
       this.server.to(roomId).emit('game:finished', result);
 
-      // Reset room for new game after a short delay
+      // Delete room after a short delay (let clients see the results first)
       setTimeout(async () => {
         try {
-          const resetRoom = await this.roomService.resetForNewGame(roomId);
-          // Notify clients that room is ready for a new game
-          this.server.to(roomId).emit('room:reset', {
-            room: this.roomService.toResponse(resetRoom),
-          });
+          // Notify all clients that room is closed
+          this.server.to(roomId).emit('room:closed');
+          // Delete the room
+          await this.roomService.deleteRoom(roomId);
+          // Clean up game state
+          await this.gameService.deleteGame(roomId);
         } catch (error) {
-          console.error('Failed to reset room for new game:', error);
+          console.error('Failed to delete room after game:', error);
         }
-      }, 2000);
-
-      // Clean up game state after 1 minute
-      setTimeout(async () => {
-        await this.gameService.deleteGame(roomId);
-      }, 60000);
+      }, 5000); // 5 seconds to view results
     } catch (error) {
       console.error('Failed to end game:', error);
     }

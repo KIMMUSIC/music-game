@@ -12,7 +12,7 @@ export function Layout({ children }: LayoutProps) {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
+      await fetch('/auth/logout', { method: 'POST', credentials: 'include' });
       logout();
       navigate('/login');
     } catch (error) {

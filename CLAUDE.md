@@ -138,6 +138,94 @@ TypeScript 5.x (Backend: Node.js 20 LTS, Frontend: React 18): Follow standard co
 1. `waiting` → Players join, set ready
 2. `playing` → Game in progress
 3. `finished` → Game ended, shows results
-4. Auto-reset to `waiting` after 2 seconds
+4. Room is deleted 5 seconds after game ends (players redirected to home)
+
+## Bugfixes Log (2026-01-22)
+
+### 10. Chat Message Duplication
+**Problem**: When one person sends a chat message, others see it multiple times
+**Root Cause**: Socket listeners in `chatStore.ts` weren't being removed on reset, causing accumulation
+**Fix**: `frontend/src/stores/chatStore.ts`
+- Added `socket.off('chat:message')` in the reset function to clean up listeners
+
+### 11. Room Deletion After Game
+**Problem**: Room was resetting to waiting state instead of being deleted after game ends
+**Root Cause**: Room used `resetForNewGame()` instead of deleting
+**Fix**:
+- `backend/services/game/src/services/room.service.ts` - Made `deleteRoom` public with player mapping cleanup
+- `backend/services/game/src/gateways/room.gateway.ts` - Delete room 5 seconds after game ends, emit `room:closed` event
+- `frontend/src/pages/GamePlay.tsx` - Navigate to home when room is null after game
+
+### 12. WebSocket CORS Wildcard Security Issue
+**Problem**: WebSocket CORS was set to wildcard `*`, allowing any origin
+**Root Cause**: Security oversight in initial implementation
+**Fix**: `backend/services/game/src/gateways/room.gateway.ts`
+- Replaced wildcard with domain-specific validation function
+- Allows localhost for development and `*.musicquiz.cloud` for production
+
+### 13. Socket Listener Duplication in roomStore
+**Problem**: Room socket listeners accumulated on reconnection
+**Root Cause**: `connect()` didn't remove existing listeners before adding new ones
+**Fix**: `frontend/src/stores/roomStore.ts`
+- Added `socket.off()` calls for all event types before registering new listeners
+
+### 14. Socket Duplicate Connections in friendsStore
+**Problem**: Friends socket creating multiple connections
+**Root Cause**: No check for existing connected socket
+**Fix**: `frontend/src/stores/friendsStore.ts`
+- Check if socket is already connected before creating new connection
+- Clean up existing socket before creating new one
+
+### 15. Missing Error Boundary
+**Problem**: React errors caused white screen without recovery option
+**Root Cause**: No error boundary in the application
+**Fix**: `frontend/src/App.tsx`
+- Added `ErrorBoundary` class component wrapping the entire app
+- Shows error message with refresh button on errors
+
+### 16. SSL Certificate Verification Issue
+**Problem**: Database connections failing in production due to SSL certificate verification
+**Root Cause**: Hardcoded `rejectUnauthorized: false` not configurable
+**Fix**: All 4 `database.config.ts` files (auth, quiz, game, social)
+- Added `DB_SSL_MODE` environment variable support
+- Options: `disable`, `no-verify`, `require` (default)
+
+### 17. Input Validation Missing on Query Parameters
+**Problem**: No validation on `limit` and `offset` parameters in quiz API
+**Root Cause**: Direct use of query parameters without sanitization
+**Fix**: `backend/services/quiz/src/controllers/quiz.controller.ts`
+- Added max limits (MAX_LIMIT=100, MAX_OFFSET=10000)
+- Validate and sanitize all limit/offset parameters
+
+### 18. Scoring Mode Removal (Feature Change)
+**Problem**: Scoring mode option was confusing, wanted to simplify to first-correct-only
+**Change**: Removed `scoringMode` option entirely, always use first-correct-only mode
+**Files Modified**:
+- `backend/services/game/src/entities/room.types.ts` - Removed `ScoringMode` type and `scoringMode` field
+- `backend/services/game/src/entities/game.types.ts` - Removed `scoringMode` field
+- `backend/services/game/src/services/room.service.ts` - Removed from default settings
+- `backend/services/game/src/services/game.service.ts` - Always use first_correct_only logic
+- `backend/services/game/src/gateways/room.gateway.ts` - Removed from game state response
+- `frontend/src/services/room.ts` - Removed `ScoringMode` type
+- `frontend/src/stores/gameStore.ts` - Removed `scoringMode` state
+- `frontend/src/pages/CreateRoom.tsx` - Removed scoring mode UI
+- `frontend/src/pages/GamePlay.tsx` - Removed `scoringMode` usage
+
+## Scoring System
+
+### Current Behavior (First Correct Only)
+- Only the first player to answer correctly earns points
+- Base points: 1000 + time bonus (up to 500)
+- Subsequent correct answers receive 0 points
+- If hint is revealed: 10% point penalty
+
+### Point Calculation
+```
+points = (basePoints + timeBonus) * (1 - hintPenalty)
+where:
+  basePoints = 1000
+  timeBonus = (timeRemaining / totalTime) * 500
+  hintPenalty = 0.10 if hint revealed, else 0
+```
 
 <!-- MANUAL ADDITIONS END -->

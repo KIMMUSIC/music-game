@@ -73,37 +73,30 @@ export interface GameDetails {
 
 export const gameHistoryApi = {
   async getMyGames(limit = 20, offset = 0): Promise<{ games: GameHistoryItem[]; total: number }> {
-    const response = await api.get(`/game-history/my-games?limit=${limit}&offset=${offset}`);
-    return response.data;
+    return api.get<{ games: GameHistoryItem[]; total: number }>(`/game-history/my-games?limit=${limit}&offset=${offset}`);
   },
 
   async getMyStats(): Promise<PlayerStats> {
-    const response = await api.get('/game-history/my-stats');
-    return response.data;
+    return api.get<PlayerStats>('/game-history/my-stats');
   },
 
   async getPlayerGames(playerId: string, limit = 20, offset = 0): Promise<{ games: GameHistoryItem[]; total: number }> {
-    const response = await api.get(`/game-history/players/${playerId}/games?limit=${limit}&offset=${offset}`);
-    return response.data;
+    return api.get<{ games: GameHistoryItem[]; total: number }>(`/game-history/players/${playerId}/games?limit=${limit}&offset=${offset}`);
   },
 
   async getPlayerStats(playerId: string): Promise<PlayerStats> {
-    const response = await api.get(`/game-history/players/${playerId}/stats`);
-    return response.data;
+    return api.get<PlayerStats>(`/game-history/players/${playerId}/stats`);
   },
 
   async getGameDetails(gameId: string): Promise<GameDetails> {
-    const response = await api.get(`/game-history/games/${gameId}`);
-    return response.data;
+    return api.get<GameDetails>(`/game-history/games/${gameId}`);
   },
 
   async getGlobalLeaderboard(limit = 50): Promise<{ leaderboard: GlobalLeaderboardEntry[] }> {
-    const response = await api.get(`/game-history/leaderboard/global?limit=${limit}`);
-    return response.data;
+    return api.get<{ leaderboard: GlobalLeaderboardEntry[] }>(`/game-history/leaderboard/global?limit=${limit}`);
   },
 
   async getQuizLeaderboard(quizId: string, limit = 20): Promise<{ leaderboard: GlobalLeaderboardEntry[] }> {
-    const response = await api.get(`/game-history/leaderboard/quiz/${quizId}?limit=${limit}`);
-    return response.data;
+    return api.get<{ leaderboard: GlobalLeaderboardEntry[] }>(`/game-history/leaderboard/quiz/${quizId}?limit=${limit}`);
   },
 };

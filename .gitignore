@@ -74,3 +74,10 @@ uploads/
 
 # Windows artifacts
 nul
+
+# Infrastructure secrets (task definitions with hardcoded secrets)
+infrastructure/ecs/*-task-def.json
+encryption.json
+
+# Scripts with potential secrets
+infrastructure/scripts/

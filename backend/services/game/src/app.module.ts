@@ -14,6 +14,7 @@ import { PlayerGameResult } from './entities/player-game-result.entity';
 import { RoomController } from './controllers/room.controller';
 import { GameController } from './controllers/game.controller';
 import { GameHistoryController } from './controllers/game-history.controller';
+import { HealthController } from './controllers/health.controller';
 
 // Services
 import { RoomService } from './services/room.service';
@@ -40,7 +41,7 @@ import { JwtAuthGuard } from './guards/jwt-auth.guard';
     }),
     TypeOrmModule.forFeature([GameResult, PlayerGameResult]),
   ],
-  controllers: [RoomController, GameController, GameHistoryController],
+  controllers: [RoomController, GameController, GameHistoryController, HealthController],
   providers: [
     RoomService,
     GameService,

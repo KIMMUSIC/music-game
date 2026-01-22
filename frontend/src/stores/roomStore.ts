@@ -87,6 +87,21 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   connect: (token) => {
     const socket = roomSocket.connect(token);
 
+    // Remove existing listeners to prevent duplicates
+    socket.off('connect');
+    socket.off('disconnect');
+    socket.off('connect_error');
+    socket.off('room:rejoined');
+    socket.off('room:player_joined');
+    socket.off('room:player_left');
+    socket.off('room:player_ready');
+    socket.off('room:player_kicked');
+    socket.off('room:kicked');
+    socket.off('room:settings_updated');
+    socket.off('room:game_starting');
+    socket.off('room:reset');
+    socket.off('room:closed');
+
     socket.on('connect', () => {
       set({ isConnected: true, error: null });
     });
@@ -99,43 +114,43 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       set({ error: 'Failed to connect to game server' });
     });
 
-    roomSocket.on('room:rejoined', (room) => {
+    socket.on('room:rejoined', (room) => {
       set({ room });
     });
 
-    roomSocket.on('room:player_joined', ({ room }) => {
+    socket.on('room:player_joined', ({ room }) => {
       set({ room });
     });
 
-    roomSocket.on('room:player_left', ({ room }) => {
+    socket.on('room:player_left', ({ room }) => {
       set({ room });
     });
 
-    roomSocket.on('room:player_ready', ({ room }) => {
+    socket.on('room:player_ready', ({ room }) => {
       set({ room });
     });
 
-    roomSocket.on('room:player_kicked', ({ room }) => {
+    socket.on('room:player_kicked', ({ room }) => {
       set({ room });
     });
 
-    roomSocket.on('room:kicked', () => {
+    socket.on('room:kicked', () => {
       set({ room: null, error: 'You were kicked from the room' });
     });
 
-    roomSocket.on('room:settings_updated', ({ room }) => {
+    socket.on('room:settings_updated', ({ room }) => {
       set({ room });
     });
 
-    roomSocket.on('room:game_starting', ({ room }) => {
+    socket.on('room:game_starting', ({ room }) => {
       set({ room });
     });
 
-    roomSocket.on('room:reset', ({ room }) => {
+    socket.on('room:reset', ({ room }) => {
       set({ room });
     });
 
-    roomSocket.on('room:closed', () => {
+    socket.on('room:closed', () => {
       set({ room: null });
     });
   },

@@ -42,7 +42,6 @@ export class RoomService {
       timeLimit: 10,
       showLeaderboard: true,
       allowLateJoin: false,
-      scoringMode: 'all_correct',
       liveScoreDisplay: 'hidden',
       chatEnabled: true,
       skipVotingEnabled: false,
@@ -197,7 +196,8 @@ export class RoomService {
 
     // If no players left, delete room
     if (room.players.length === 0) {
-      await this.deleteRoom(room);
+      await this.redis.del(`${this.roomPrefix}${room.id}`);
+      await this.redis.del(`${this.codePrefix}${room.code}`);
       return null;
     }
 
@@ -321,9 +321,18 @@ export class RoomService {
     );
   }
 
-  private async deleteRoom(room: RoomState): Promise<void> {
-    await this.redis.del(`${this.roomPrefix}${room.id}`);
-    await this.redis.del(`${this.codePrefix}${room.code}`);
+  async deleteRoom(roomId: string): Promise<void> {
+    try {
+      const room = await this.getRoom(roomId);
+      // Remove all player-room mappings
+      for (const player of room.players) {
+        await this.redis.del(`${this.playerRoomPrefix}${player.id}`);
+      }
+      await this.redis.del(`${this.roomPrefix}${room.id}`);
+      await this.redis.del(`${this.codePrefix}${room.code}`);
+    } catch {
+      // Room might already be deleted, ignore
+    }
   }
 
   async finishGame(roomId: string): Promise<RoomState> {

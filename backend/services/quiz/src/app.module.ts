@@ -9,6 +9,7 @@ import { Song } from './entities/song.entity';
 // Controllers
 import { QuizController } from './controllers/quiz.controller';
 import { InternalController } from './controllers/internal.controller';
+import { HealthController } from './controllers/health.controller';
 
 // Services
 import { QuizService } from './services/quiz.service';
@@ -34,16 +35,20 @@ import { InternalGuard } from '../../../shared/guards/internal.guard';
         port: configService.get<number>('DB_PORT', 5432),
         username: configService.get<string>('DB_USERNAME', 'postgres'),
         password: configService.get<string>('DB_PASSWORD', 'postgres'),
-        database: configService.get<string>('DB_NAME', 'music_game_quiz'),
+        database: configService.get<string>('DB_NAME', 'musicquiz'),
         entities: [Quiz, Song],
-        synchronize: configService.get<string>('NODE_ENV') !== 'production',
+        synchronize: true, // Enable for initial deployment - disable after tables created
         logging: configService.get<string>('NODE_ENV') === 'development',
+        ssl:
+          configService.get<string>('NODE_ENV') === 'production'
+            ? { rejectUnauthorized: false }
+            : false,
       }),
       inject: [ConfigService],
     }),
     TypeOrmModule.forFeature([Quiz, Song]),
   ],
-  controllers: [QuizController, InternalController],
+  controllers: [HealthController, QuizController, InternalController],
   providers: [
     QuizService,
     S3Service,

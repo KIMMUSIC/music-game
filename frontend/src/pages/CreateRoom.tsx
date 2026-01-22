@@ -6,7 +6,6 @@ import { Button } from '../components/common/Button';
 import { useAuthStore } from '../stores/authStore';
 import { useRoomStore } from '../stores/roomStore';
 import { quizService, Quiz } from '../services/quiz';
-import { ScoringMode } from '../services/room';
 
 const CreateRoom = () => {
   const navigate = useNavigate();
@@ -17,7 +16,6 @@ const CreateRoom = () => {
 
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [maxPlayers, setMaxPlayers] = useState(8);
-  const [scoringMode, setScoringMode] = useState<ScoringMode>('all_correct');
   const [chatEnabled, setChatEnabled] = useState(true);
   const [skipVotingEnabled, setSkipVotingEnabled] = useState(false);
   const [skipThresholdPercent, setSkipThresholdPercent] = useState(100);
@@ -68,14 +66,10 @@ const CreateRoom = () => {
   useEffect(() => {
     if (room) {
       const settingsToUpdate: Partial<{
-        scoringMode: ScoringMode;
         chatEnabled: boolean;
         skipVotingEnabled: boolean;
         skipThresholdPercent: number;
       }> = {};
-      if (scoringMode !== 'all_correct') {
-        settingsToUpdate.scoringMode = scoringMode;
-      }
       if (!chatEnabled) {
         settingsToUpdate.chatEnabled = chatEnabled;
       }
@@ -164,25 +158,6 @@ const CreateRoom = () => {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Scoring Mode
-              </label>
-              <select
-                value={scoringMode}
-                onChange={(e) => setScoringMode(e.target.value as ScoringMode)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              >
-                <option value="all_correct">All Correct Answers Score</option>
-                <option value="first_correct_only">First Correct Only</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">
-                {scoringMode === 'first_correct_only'
-                  ? 'Only the first player to answer correctly earns points.'
-                  : 'All players who answer correctly earn points.'}
-              </p>
             </div>
 
             <div className="flex items-center justify-between">

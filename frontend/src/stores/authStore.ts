@@ -67,7 +67,7 @@ export const useAuthStore = create<AuthState>()(
             headers['Authorization'] = `Bearer ${token}`;
           }
 
-          const response = await fetch('/api/auth/me', {
+          const response = await fetch('/auth/me', {
             credentials: 'include',
             headers,
           });
@@ -103,7 +103,7 @@ export const useAuthStore = create<AuthState>()(
         try {
           set({ isLoading: true, error: null, token });
 
-          const response = await fetch('/api/auth/me', {
+          const response = await fetch('/auth/me', {
             credentials: 'include',
             headers: {
               'Authorization': `Bearer ${token}`,

@@ -25,14 +25,12 @@ export interface RoomState {
   startedAt: number | null;
 }
 
-export type ScoringMode = 'all_correct' | 'first_correct_only';
 export type LiveScoreDisplay = 'full' | 'compact' | 'hidden';
 
 export interface RoomSettings {
   timeLimit: number; // seconds per question
   showLeaderboard: boolean;
   allowLateJoin: boolean;
-  scoringMode: ScoringMode;
   liveScoreDisplay: LiveScoreDisplay;
   chatEnabled: boolean;
   skipVotingEnabled: boolean;

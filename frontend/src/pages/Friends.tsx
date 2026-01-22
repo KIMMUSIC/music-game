@@ -235,9 +235,9 @@ const FriendsList = ({ friends, onRemove }: FriendsListProps) => {
 interface RequestsListProps {
   incoming: FriendRequestInfo[];
   outgoing: FriendRequestInfo[];
-  onAccept: (requestId: string) => void;
-  onReject: (requestId: string) => void;
-  onCancel: (requestId: string) => void;
+  onAccept: (requestId: string) => Promise<void>;
+  onReject: (requestId: string) => Promise<void>;
+  onCancel: (requestId: string) => Promise<void>;
 }
 
 const RequestsList = ({ incoming, outgoing, onAccept, onReject, onCancel }: RequestsListProps) => {

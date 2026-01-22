@@ -26,7 +26,6 @@ const GamePlay = () => {
     currentSong,
     roundEndTime,
     hasAnswered,
-    scoringMode,
     someoneGotIt,
     liveScores,
     roundResult,
@@ -89,14 +88,14 @@ const GamePlay = () => {
     console.log('GamePlay phase:', phase, 'roundResult:', roundResult, 'gameResult:', gameResult, 'room?.status:', room?.status);
   }, [phase, roundResult, gameResult, room?.status]);
 
-  // Navigate back to lobby when room resets to 'waiting' after game ends
+  // Navigate to home when room is closed after game ends
   useEffect(() => {
-    if (room?.status === 'waiting' && phase === 'finished') {
-      console.log('Room reset to waiting, navigating to lobby');
+    if (room === null && phase === 'finished') {
+      console.log('Room closed after game, navigating to home');
       reset(); // Reset game state
-      navigate(`/room/${roomId}`);
+      navigate('/');
     }
-  }, [room?.status, phase, roomId, navigate, reset]);
+  }, [room, phase, navigate, reset]);
 
   // Countdown timer for round
   useEffect(() => {

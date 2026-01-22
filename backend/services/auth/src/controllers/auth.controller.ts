@@ -145,7 +145,8 @@ export class AuthController {
 
     const frontendUrl = this.configService.get<string>('FRONTEND_URL');
     // Pass token in URL for cross-origin cookie issue in development
-    return res.redirect(`${frontendUrl}/auth/callback?token=${tokens.accessToken}`);
+    // Use /oauth-callback to avoid ALB routing conflict with /auth/*
+    return res.redirect(`${frontendUrl}/oauth-callback?token=${tokens.accessToken}`);
   }
 
   private setTokenCookies(

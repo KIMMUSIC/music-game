@@ -25,7 +25,12 @@ interface FriendsState {
   clearError: () => void;
 }
 
-const SOCIAL_WS_URL = import.meta.env.VITE_SOCIAL_SERVICE_URL || 'http://localhost:3004';
+// In production, use relative URL to connect through ALB; in development use localhost
+const SOCIAL_WS_URL = import.meta.env.VITE_SOCIAL_SERVICE_URL || (
+  typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? ''
+    : 'http://localhost:3004'
+);
 
 export const useFriendsStore = create<FriendsState>((set, get) => ({
   friends: [],
@@ -145,8 +150,16 @@ export const useFriendsStore = create<FriendsState>((set, get) => ({
   },
 
   connectSocket: () => {
-    const { socket } = get();
-    if (socket?.connected) return;
+    const { socket: existingSocket } = get();
+
+    // If already connected, do nothing
+    if (existingSocket?.connected) return;
+
+    // If socket exists but disconnected, clean it up first
+    if (existingSocket) {
+      existingSocket.removeAllListeners();
+      existingSocket.disconnect();
+    }
 
     const newSocket = io(`${SOCIAL_WS_URL}/friends`, {
       withCredentials: true,

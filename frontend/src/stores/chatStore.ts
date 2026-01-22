@@ -108,6 +108,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   reset: () => {
+    // Remove chat socket listener to prevent duplicates
+    const socket = roomSocket.getSocket();
+    if (socket) {
+      socket.off('chat:message');
+    }
     listenersInitialized = false;
     set({ messages: [], isLoading: false, error: null });
   },

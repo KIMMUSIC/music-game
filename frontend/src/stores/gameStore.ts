@@ -29,8 +29,7 @@ interface GameState {
   hasAnswered: boolean;
   scores: PlayerScore[];
 
-  // First-correct-only mode
-  scoringMode: 'all_correct' | 'first_correct_only';
+  // First-correct-only mode (always enabled)
   someoneGotIt: boolean;
 
   // Live score display
@@ -102,7 +101,6 @@ const initialState = {
   roundEndTime: null,
   hasAnswered: false,
   scores: [],
-  scoringMode: 'all_correct' as 'all_correct' | 'first_correct_only',
   someoneGotIt: false,
   liveScoreDisplay: 'hidden' as LiveScoreDisplay,
   liveScores: [] as LiveScoreEntry[],
@@ -246,7 +244,6 @@ export const useGameStore = create<GameState>((set, get) => ({
         totalRounds: response.state.totalRounds,
         currentSong: response.state.currentSong,
         roundEndTime: response.state.roundEndTime,
-        scoringMode: response.state.scoringMode || 'all_correct',
         someoneGotIt: response.state.someoneGotIt || false,
       });
     }

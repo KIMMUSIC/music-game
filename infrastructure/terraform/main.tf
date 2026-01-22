@@ -12,13 +12,13 @@ terraform {
   }
 
   # Uncomment to use S3 backend for state management
-  # backend "s3" {
-  #   bucket         = "musicquiz-terraform-state"
-  #   key            = "terraform.tfstate"
-  #   region         = "ap-northeast-2"
-  #   encrypt        = true
-  #   dynamodb_table = "musicquiz-terraform-locks"
-  # }
+  backend "s3" {
+     bucket         = "musicquiz-terraform-state"
+     key            = "terraform.tfstate"
+     region         = "ap-northeast-2"
+     encrypt        = true
+     dynamodb_table = "musicquiz-terraform-locks"
+  }
 }
 
 provider "aws" {

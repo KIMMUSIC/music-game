@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PassportStrategy } from '@nestjs/passport';
 import { Strategy, VerifyCallback, Profile } from 'passport-google-oauth20';
@@ -13,13 +13,32 @@ export interface OAuthProfile {
 
 @Injectable()
 export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
+  private readonly logger = new Logger(GoogleStrategy.name);
+
   constructor(private configService: ConfigService) {
+    const clientID = configService.get<string>('GOOGLE_CLIENT_ID', '');
+    const clientSecret = configService.get<string>('GOOGLE_CLIENT_SECRET', '');
+    const callbackURL = configService.get<string>(
+      'GOOGLE_CALLBACK_URL',
+      'http://localhost:3001/auth/google/callback',
+    );
+
+    const isConfigured = Boolean(
+      clientID && clientSecret && !clientID.startsWith('your-'),
+    );
+
     super({
-      clientID: configService.get<string>('GOOGLE_CLIENT_ID'),
-      clientSecret: configService.get<string>('GOOGLE_CLIENT_SECRET'),
-      callbackURL: configService.get<string>('GOOGLE_CALLBACK_URL'),
+      clientID: isConfigured ? clientID : 'placeholder-client-id',
+      clientSecret: isConfigured ? clientSecret : 'placeholder-client-secret',
+      callbackURL: callbackURL,
       scope: ['email', 'profile'],
     });
+
+    if (!isConfigured) {
+      this.logger.warn(
+        'Google OAuth is not configured. Google login will be disabled.',
+      );
+    }
   }
 
   async validate(

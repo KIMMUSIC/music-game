@@ -12,14 +12,12 @@ export interface RoomPlayer {
   score: number;
 }
 
-export type ScoringMode = 'all_correct' | 'first_correct_only';
 export type LiveScoreDisplay = 'full' | 'compact' | 'hidden';
 
 export interface RoomSettings {
   timeLimit: number;
   showLeaderboard: boolean;
   allowLateJoin: boolean;
-  scoringMode: ScoringMode;
   liveScoreDisplay: LiveScoreDisplay;
   chatEnabled: boolean;
   skipVotingEnabled: boolean;
@@ -50,6 +48,11 @@ export interface RoomSocketEvents {
   'room:update_settings': { settings: Partial<RoomSettings> };
   'room:start': void;
 
+  // Game events (outgoing)
+  'game:submit_answer': { answer: string; roomId: string };
+  'game:vote_skip': { roomId: string };
+  'game:get_state': { roomId: string };
+
   // Incoming events
   connected: { userId: string };
   'room:rejoined': Room;
@@ -61,6 +64,7 @@ export interface RoomSocketEvents {
   'room:settings_updated': { settings: RoomSettings; room: Room };
   'room:game_starting': { room: Room };
   'room:closed': void;
+  'room:reset': { room: Room };
 }
 
 class RoomSocketService {
@@ -73,7 +77,13 @@ class RoomSocketService {
     }
 
     this.token = token;
-    this.socket = io(`${import.meta.env.VITE_GAME_SERVICE_URL || 'http://localhost:3003'}/room`, {
+    // In production, use relative URL to connect through ALB; in development use localhost
+    const gameServiceUrl = import.meta.env.VITE_GAME_SERVICE_URL || (
+      typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+        ? ''
+        : 'http://localhost:3003'
+    );
+    this.socket = io(`${gameServiceUrl}/room`, {
       auth: { token },
       transports: ['websocket'],
       reconnection: true,

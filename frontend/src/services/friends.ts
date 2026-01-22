@@ -26,12 +26,33 @@ export interface PendingRequests {
   outgoing: FriendRequestInfo[];
 }
 
-const SOCIAL_API_URL = import.meta.env.VITE_SOCIAL_SERVICE_URL || 'http://localhost:3004';
+// Social API uses /social prefix via ALB routing
+const SOCIAL_API_PREFIX = '/social';
+
+// Helper to get auth token from localStorage
+const getAuthToken = (): string | null => {
+  try {
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.token || null;
+    }
+  } catch {
+    // Ignore parsing errors
+  }
+  return null;
+};
 
 const socialApi = {
   async get<T>(endpoint: string): Promise<T> {
-    const response = await fetch(`${SOCIAL_API_URL}${endpoint}`, {
+    const token = getAuthToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${SOCIAL_API_PREFIX}${endpoint}`, {
       credentials: 'include',
+      headers,
     });
     if (!response.ok) {
       const error = await response.json().catch(() => ({ message: 'Request failed' }));
@@ -41,9 +62,14 @@ const socialApi = {
   },
 
   async post<T>(endpoint: string, data?: unknown): Promise<T> {
-    const response = await fetch(`${SOCIAL_API_URL}${endpoint}`, {
+    const token = getAuthToken();
+    const headers: HeadersInit = { 'Content-Type': 'application/json' };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${SOCIAL_API_PREFIX}${endpoint}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       credentials: 'include',
       body: data ? JSON.stringify(data) : undefined,
     });
@@ -55,8 +81,14 @@ const socialApi = {
   },
 
   async delete(endpoint: string): Promise<void> {
-    const response = await fetch(`${SOCIAL_API_URL}${endpoint}`, {
+    const token = getAuthToken();
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const response = await fetch(`${SOCIAL_API_PREFIX}${endpoint}`, {
       method: 'DELETE',
+      headers,
       credentials: 'include',
     });
     if (!response.ok) {

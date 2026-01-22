@@ -72,13 +72,24 @@ export class QuizController {
     @Query('limit') limit?: string,
     @Query('offset') offset?: string,
   ) {
-    const quizzes = await this.quizService.findPublic(
-      limit ? parseInt(limit, 10) : 20,
-      offset ? parseInt(offset, 10) : 0,
-    );
+    // Validate and sanitize limit/offset with max values
+    const MAX_LIMIT = 100;
+    const MAX_OFFSET = 10000;
+
+    let parsedLimit = limit ? parseInt(limit, 10) : 20;
+    let parsedOffset = offset ? parseInt(offset, 10) : 0;
+
+    // Ensure values are valid numbers and within bounds
+    if (isNaN(parsedLimit) || parsedLimit < 1) parsedLimit = 20;
+    if (isNaN(parsedOffset) || parsedOffset < 0) parsedOffset = 0;
+    parsedLimit = Math.min(parsedLimit, MAX_LIMIT);
+    parsedOffset = Math.min(parsedOffset, MAX_OFFSET);
+
+    const quizzes = await this.quizService.findPublic(parsedLimit, parsedOffset);
 
     return quizzes.map((quiz) => ({
       id: quiz.id,
+      creatorId: quiz.creatorId,
       title: quiz.title,
       description: quiz.description,
       playCount: quiz.playCount,
@@ -93,10 +104,13 @@ export class QuizController {
       return [];
     }
 
-    const quizzes = await this.quizService.search(
-      query,
-      limit ? parseInt(limit, 10) : 20,
-    );
+    // Validate limit with max value
+    const MAX_LIMIT = 50;
+    let parsedLimit = limit ? parseInt(limit, 10) : 20;
+    if (isNaN(parsedLimit) || parsedLimit < 1) parsedLimit = 20;
+    parsedLimit = Math.min(parsedLimit, MAX_LIMIT);
+
+    const quizzes = await this.quizService.search(query, parsedLimit);
 
     return quizzes.map((quiz) => ({
       id: quiz.id,
