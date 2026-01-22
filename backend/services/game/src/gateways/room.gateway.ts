@@ -403,6 +403,19 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
         totalPlayers: room.players.length,
       });
 
+      // Send initial leaderboard with all players at 0 points
+      const initialLeaderboard = await this.gameService.getLeaderboard(room.id, room.players);
+      this.server.to(client.roomId).emit('game:score_update', {
+        leaderboard: initialLeaderboard.map((entry) => ({
+          playerId: entry.playerId,
+          nickname: entry.nickname,
+          score: entry.score,
+          rank: entry.rank,
+          correctCount: entry.correctAnswers,
+          previousRank: entry.rank,
+        })),
+      });
+
       // Start the first countdown after a short delay
       setTimeout(() => {
         this.startGameCountdown(room.id);

@@ -24,8 +24,8 @@ import { RoomState, RoomPlayer } from '../entities/room.types';
 export class GameService {
   private readonly gamePrefix = 'game:';
   private readonly gameTTL = 3600 * 3; // 3 hours
-  private readonly basePoints = 1000;
-  private readonly timeBonusMax = 500;
+  private readonly basePoints = 1; // Simple 1 point per correct answer
+  private readonly timeBonusMax = 0; // No time bonus
 
   constructor(
     @Inject('REDIS_CLIENT') private readonly redis: Redis,
@@ -152,27 +152,14 @@ export class GameService {
     // Check if answer is correct (fuzzy matching)
     const isCorrect = this.checkAnswer(normalizedAnswer, currentSong);
 
-    // Calculate points based on scoring mode
-    const timeTaken = now - game.roundStartTime!;
-    const timeRemaining = game.roundEndTime! - now;
-    const currentTimeLimit = game.currentSong!.timeLimit;
-    const timeBonus = isCorrect
-      ? Math.floor((timeRemaining / (currentTimeLimit * 1000)) * this.timeBonusMax)
-      : 0;
-
+    // Simple scoring: 1 point for first correct answer
     let points = 0;
     let isFirstCorrect = false;
 
     if (isCorrect) {
-      // First correct only: only the first correct answer gets points
+      // First correct only: only the first correct answer gets 1 point
       if (game.firstCorrectPlayerId === null) {
-        let baseAndBonus = this.basePoints + timeBonus;
-        // Apply hint penalty if hint was revealed
-        if (game.hintRevealed && game.hintPenaltyPercent > 0) {
-          const penaltyReduction = Math.floor(baseAndBonus * (game.hintPenaltyPercent / 100));
-          baseAndBonus = Math.max(baseAndBonus - penaltyReduction, 100); // Min 100 points
-        }
-        points = baseAndBonus;
+        points = this.basePoints; // 1 point
         game.firstCorrectPlayerId = playerId;
         game.firstCorrectNickname = playerNickname;
         isFirstCorrect = true;
@@ -186,7 +173,7 @@ export class GameService {
       submittedAt: now,
       isCorrect,
       points,
-      timeBonus: isCorrect ? timeBonus : 0,
+      timeBonus: 0, // No time bonus
     };
 
     game.answers.set(playerId, playerAnswer);
@@ -281,6 +268,9 @@ export class GameService {
 
     game.roundSkipped = true;
     game.phase = 'revealing';
+    // Clear round timing to prevent carry-over
+    game.roundEndTime = null;
+    game.roundStartTime = null;
 
     const roundResult: RoundResult = {
       songIndex: game.currentRound,
@@ -311,6 +301,9 @@ export class GameService {
     }
 
     game.phase = 'revealing';
+    // Clear round timing to prevent carry-over
+    game.roundEndTime = null;
+    game.roundStartTime = null;
 
     const roundResult: RoundResult = {
       songIndex: game.currentRound,
@@ -333,6 +326,9 @@ export class GameService {
 
     // Set phase to prevent more answers
     game.phase = 'round_ended';
+    // Clear round timing to prevent carry-over
+    game.roundEndTime = null;
+    game.roundStartTime = null;
 
     const roundResult: RoundResult = {
       songIndex: game.currentRound,

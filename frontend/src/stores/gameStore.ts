@@ -354,7 +354,11 @@ export const useGameStore = create<GameState>((set, get) => ({
       song: GameSong;
       endTime: number;
     }) => {
-      get().startRound(data);
+      console.log('game:round_started received:', data);
+      // Calculate our own endTime based on timeLimit to avoid clock sync issues
+      const localEndTime = Date.now() + (data.song.timeLimit || 30) * 1000;
+      console.log('Using localEndTime:', localEndTime, 'vs server endTime:', data.endTime);
+      get().startRound({ ...data, endTime: localEndTime });
     });
 
     // Player answered

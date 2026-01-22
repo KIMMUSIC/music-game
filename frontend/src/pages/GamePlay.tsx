@@ -18,7 +18,7 @@ const GamePlay = () => {
   const { id: roomId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, token } = useAuthStore();
-  const { room, connect } = useRoomStore();
+  const { room, connect, leaveRoom } = useRoomStore();
   const {
     phase,
     currentRound,
@@ -82,10 +82,12 @@ const GamePlay = () => {
 
     return () => {
       clearTimeout(timer);
+      // Leave the room when navigating away
+      leaveRoom();
       reset();
       resetChat();
     };
-  }, [connect, initializeListeners, initChatListeners, requestGameState, reset, resetChat, token]);
+  }, [connect, initializeListeners, initChatListeners, requestGameState, reset, resetChat, leaveRoom, token]);
 
   // Debug: log phase changes
   useEffect(() => {
@@ -175,21 +177,53 @@ const GamePlay = () => {
     navigate(`/results/${roomId}`);
   };
 
-  // Countdown phase
+  // Countdown phase - Music loading animation
   if (phase === 'countdown') {
     return (
       <Layout>
         <div className="max-w-2xl mx-auto text-center py-12">
-          <Card className="p-12">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              Round {currentRound} of {totalRounds}
-            </h2>
-            <div className="text-8xl font-bold text-purple-600 mb-4">
-              {countdownSeconds}
+          <Card className="p-12 bg-gradient-to-br from-purple-600 to-pink-500">
+            <div className="text-white">
+              <p className="text-lg font-medium opacity-80 mb-2">
+                Round {currentRound} of {totalRounds}
+              </p>
+
+              {/* Music Wave Animation */}
+              <div className="flex justify-center items-end gap-1 h-24 my-8">
+                {[...Array(12)].map((_, i) => (
+                  <div
+                    key={i}
+                    className="w-3 bg-white/90 rounded-full"
+                    style={{
+                      animation: 'musicWave 1s ease-in-out infinite',
+                      animationDelay: `${i * 0.1}s`,
+                      height: '20%',
+                    }}
+                  />
+                ))}
+              </div>
+
+              <h2 className="text-3xl font-bold mb-2">
+                Loading Music...
+              </h2>
+              <p className="text-lg opacity-80">
+                Get ready to listen!
+              </p>
             </div>
-            <p className="text-xl text-gray-600">Get ready to listen!</p>
           </Card>
         </div>
+
+        {/* CSS Animation */}
+        <style>{`
+          @keyframes musicWave {
+            0%, 100% {
+              height: 20%;
+            }
+            50% {
+              height: 80%;
+            }
+          }
+        `}</style>
       </Layout>
     );
   }
@@ -229,7 +263,6 @@ const GamePlay = () => {
                     <button
                       onClick={() => {
                         if (confirm('게임을 나가시겠습니까?')) {
-                          reset();
                           navigate('/');
                         }
                       }}
