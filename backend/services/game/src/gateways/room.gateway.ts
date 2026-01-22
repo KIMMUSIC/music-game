@@ -444,9 +444,13 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
             previewStart: game.currentSong.previewStart,
             previewDuration: game.currentSong.previewDuration,
             timeLimit: game.currentSong.timeLimit,
+            matchMode: game.currentSong.matchMode,
           } : null,
           roundEndTime: game.roundEndTime,
           someoneGotIt: game.firstCorrectPlayerId !== null,
+          // Hint info for reconnection
+          currentHint: game.hintRevealed && game.currentSong?.hint ? game.currentSong.hint : null,
+          hintPenaltyPercent: game.hintRevealed ? game.hintPenaltyPercent : 0,
         },
       };
     } catch (error) {
@@ -622,6 +626,86 @@ export class RoomGateway implements OnGatewayConnection, OnGatewayDisconnect {
       return { success: true, voted: true };
     } catch (error) {
       return { error: error instanceof Error ? error.message : 'Failed to vote skip' };
+    }
+  }
+
+  @SubscribeMessage('game:report_playback_error')
+  async handlePlaybackError(
+    @ConnectedSocket() client: AuthenticatedSocket,
+    @MessageBody() data: { roomId: string },
+  ) {
+    if (!client.userId || !client.roomId) {
+      return { error: 'Not in a room' };
+    }
+
+    try {
+      const room = await this.roomService.getRoom(data.roomId);
+      const totalPlayers = room.players.length;
+
+      const { reported, errorCount, shouldSkip } = await this.gameService.reportPlaybackError(
+        data.roomId,
+        client.userId,
+        totalPlayers,
+      );
+
+      if (!reported) {
+        return { success: true, alreadyReported: true };
+      }
+
+      // Notify others about the playback error
+      this.server.to(data.roomId).emit('game:playback_error_reported', {
+        playerId: client.userId,
+        errorCount,
+        totalPlayers,
+        percent: Math.round((errorCount / totalPlayers) * 100),
+      });
+
+      // If threshold reached (50%+ players can't play), auto-skip
+      if (shouldSkip) {
+        // Clear the round timer
+        this.clearRoundTimer(data.roomId);
+
+        this.server.to(data.roomId).emit('game:skip_executed', {
+          reason: 'playback_error',
+        });
+
+        // Skip the round
+        const roundResult = await this.gameService.skipRound(data.roomId);
+
+        // Emit round skipped/timeout event
+        this.server.to(data.roomId).emit('game:round_timeout', {
+          round: roundResult.songIndex + 1,
+          song: {
+            title: roundResult.song.title,
+            artist: roundResult.song.artist,
+          },
+          correctAnswer: roundResult.correctAnswer,
+          skipped: true,
+          skipReason: 'playback_error',
+        });
+
+        // Emit live score update
+        const leaderboard = await this.gameService.getLeaderboard(data.roomId, room.players);
+        this.server.to(data.roomId).emit('game:score_update', {
+          leaderboard: leaderboard.map((entry) => ({
+            playerId: entry.playerId,
+            nickname: entry.nickname,
+            score: entry.score,
+            rank: entry.rank,
+            correctCount: entry.correctAnswers,
+            previousRank: entry.rank,
+          })),
+        });
+
+        // Proceed to next round after short delay
+        setTimeout(async () => {
+          await this.proceedToNextRoundQuick(data.roomId);
+        }, 2000);
+      }
+
+      return { success: true, reported: true };
+    } catch (error) {
+      return { error: error instanceof Error ? error.message : 'Failed to report playback error' };
     }
   }
 

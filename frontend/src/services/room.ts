@@ -51,6 +51,7 @@ export interface RoomSocketEvents {
   // Game events (outgoing)
   'game:submit_answer': { answer: string; roomId: string };
   'game:vote_skip': { roomId: string };
+  'game:report_playback_error': { roomId: string };
   'game:get_state': { roomId: string };
 
   // Incoming events

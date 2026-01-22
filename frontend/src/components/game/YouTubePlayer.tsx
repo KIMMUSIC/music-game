@@ -65,11 +65,16 @@ export const YouTubePlayer = forwardRef<YouTubePlayerHandle, YouTubePlayerProps>
       if (!previewDuration || previewDuration <= 0) return;
 
       const checkAndLoop = () => {
-        if (playerRef.current) {
-          const currentTime = playerRef.current.getCurrentTime();
-          const endTime = startTime + previewDuration;
-          if (currentTime >= endTime) {
-            playerRef.current.seekTo(startTime, true);
+        // Check if player exists and getCurrentTime is available (player is ready)
+        if (playerRef.current && typeof playerRef.current.getCurrentTime === 'function') {
+          try {
+            const currentTime = playerRef.current.getCurrentTime();
+            const endTime = startTime + previewDuration;
+            if (currentTime >= endTime) {
+              playerRef.current.seekTo(startTime, true);
+            }
+          } catch {
+            // Player not ready yet, ignore
           }
         }
       };

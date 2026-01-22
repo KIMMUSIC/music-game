@@ -58,6 +58,7 @@ export class GameService {
       skipVotingEnabled: room.settings.skipVotingEnabled ?? false,
       skipThresholdPercent: room.settings.skipThresholdPercent ?? 100,
       roundSkipped: false,
+      playbackErrorReports: new Set(),
       hintsEnabled: quizData.hintsEnabled,
       hintRevealed: false,
       hintDelaySeconds: 5, // Fixed 5 second delay for hints
@@ -79,8 +80,9 @@ export class GameService {
     // Restore Maps from JSON
     parsed.answers = new Map(Object.entries(parsed.answers || {}));
     parsed.scores = new Map(Object.entries(parsed.scores || {}));
-    // Restore Set from array
+    // Restore Sets from arrays
     parsed.skipVotes = new Set(parsed.skipVotes || []);
+    parsed.playbackErrorReports = new Set(parsed.playbackErrorReports || []);
     // Ensure new fields have defaults for backward compatibility
     parsed.firstCorrectPlayerId = parsed.firstCorrectPlayerId || null;
     parsed.firstCorrectNickname = parsed.firstCorrectNickname || null;
@@ -113,6 +115,7 @@ export class GameService {
     game.firstCorrectPlayerId = null;
     game.firstCorrectNickname = null;
     game.skipVotes = new Set();
+    game.playbackErrorReports = new Set();
     game.roundSkipped = false;
     game.hintRevealed = false;
 
@@ -230,6 +233,41 @@ export class GameService {
     return {
       voted: true,
       skipVoteCount,
+      shouldSkip,
+    };
+  }
+
+  async reportPlaybackError(
+    roomId: string,
+    playerId: string,
+    totalPlayers: number,
+  ): Promise<{ reported: boolean; errorCount: number; shouldSkip: boolean }> {
+    const game = await this.getGame(roomId);
+
+    if (game.phase !== 'playing') {
+      return { reported: false, errorCount: 0, shouldSkip: false };
+    }
+
+    if (game.playbackErrorReports.has(playerId)) {
+      // Already reported
+      return {
+        reported: false,
+        errorCount: game.playbackErrorReports.size,
+        shouldSkip: false,
+      };
+    }
+
+    game.playbackErrorReports.add(playerId);
+    await this.saveGame(game);
+
+    const errorCount = game.playbackErrorReports.size;
+    // Auto-skip if more than 50% of players report playback errors
+    const threshold = Math.ceil(totalPlayers * 0.5);
+    const shouldSkip = errorCount >= threshold;
+
+    return {
+      reported: true,
+      errorCount,
       shouldSkip,
     };
   }
@@ -612,6 +650,7 @@ export class GameService {
       answers: Object.fromEntries(game.answers),
       scores: Object.fromEntries(game.scores),
       skipVotes: Array.from(game.skipVotes),
+      playbackErrorReports: Array.from(game.playbackErrorReports || []),
     };
 
     await this.redis.setex(

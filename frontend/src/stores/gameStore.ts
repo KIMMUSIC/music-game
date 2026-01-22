@@ -49,6 +49,11 @@ interface GameState {
   currentHint: string | null;
   hintPenaltyPercent: number;
 
+  // Playback errors
+  hasReportedPlaybackError: boolean;
+  playbackErrorCount: number;
+  playbackErrorPercent: number;
+
   // Round results
   roundResult: RoundEndedEvent | null;
   leaderboard: LeaderboardEntry[];
@@ -86,6 +91,7 @@ interface GameState {
   updateScores: (scores: PlayerScore[]) => void;
   submitAnswer: (roomId: string, answer: string) => Promise<void>;
   voteSkip: (roomId: string) => Promise<void>;
+  reportPlaybackError: (roomId: string) => Promise<void>;
   reset: () => void;
   requestGameState: () => Promise<void>;
   initializeListeners: () => void;
@@ -113,6 +119,9 @@ const initialState = {
   hintsEnabled: false,
   currentHint: null as string | null,
   hintPenaltyPercent: 0,
+  hasReportedPlaybackError: false,
+  playbackErrorCount: 0,
+  playbackErrorPercent: 0,
   roundResult: null,
   leaderboard: [],
   roundWinner: null as { playerId: string; nickname: string; points: number } | null,
@@ -147,6 +156,9 @@ export const useGameStore = create<GameState>((set, get) => ({
     roundSkipped: false,
     currentHint: null,
     hintPenaltyPercent: 0,
+    hasReportedPlaybackError: false,
+    playbackErrorCount: 0,
+    playbackErrorPercent: 0,
     roundWinner: null,
     revealedAnswer: null,
     showNextQuestion: false,
@@ -210,6 +222,19 @@ export const useGameStore = create<GameState>((set, get) => ({
     }
   },
 
+  reportPlaybackError: async (roomId) => {
+    const { hasReportedPlaybackError } = get();
+    if (hasReportedPlaybackError) return;
+
+    const response = await roomSocket.emit('game:report_playback_error', {
+      roomId,
+    }) as any;
+
+    if (!response.error) {
+      set({ hasReportedPlaybackError: true });
+    }
+  },
+
   reset: () => {
     // Remove all game-related socket listeners to prevent duplicates
     const socket = roomSocket.getSocket();
@@ -226,6 +251,7 @@ export const useGameStore = create<GameState>((set, get) => ({
       socket.off('game:score_update');
       socket.off('game:skip_vote_update');
       socket.off('game:skip_executed');
+      socket.off('game:playback_error_reported');
       socket.off('game:hint');
       socket.off('game:leaderboard');
       socket.off('game:finished');
@@ -245,6 +271,9 @@ export const useGameStore = create<GameState>((set, get) => ({
         currentSong: response.state.currentSong,
         roundEndTime: response.state.roundEndTime,
         someoneGotIt: response.state.someoneGotIt || false,
+        // Restore hint state on reconnection
+        currentHint: response.state.currentHint || null,
+        hintPenaltyPercent: response.state.hintPenaltyPercent || 0,
       });
     }
   },
@@ -404,6 +433,15 @@ export const useGameStore = create<GameState>((set, get) => ({
     socket.on('game:skip_executed', (data: SkipExecutedEvent) => {
       console.log('game:skip_executed received:', data);
       set({ roundSkipped: true });
+    });
+
+    // Playback error reported
+    socket.on('game:playback_error_reported', (data: { playerId: string; errorCount: number; totalPlayers: number; percent: number }) => {
+      console.log('game:playback_error_reported received:', data);
+      set({
+        playbackErrorCount: data.errorCount,
+        playbackErrorPercent: data.percent,
+      });
     });
 
     // Hint revealed

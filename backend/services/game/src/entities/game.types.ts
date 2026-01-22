@@ -54,6 +54,8 @@ export interface GameState {
   skipVotingEnabled: boolean;
   skipThresholdPercent: number;
   roundSkipped: boolean;
+  // Playback errors
+  playbackErrorReports: Set<string>; // playerIds who reported playback errors
   // Hints
   hintsEnabled: boolean;
   hintRevealed: boolean;

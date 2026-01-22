@@ -44,7 +44,11 @@ const GamePlay = () => {
     showNextQuestion,
     isLoading,
     error,
+    hasReportedPlaybackError,
+    playbackErrorCount,
+    playbackErrorPercent,
     voteSkip,
+    reportPlaybackError,
     initializeListeners,
     requestGameState,
     reset,
@@ -222,6 +226,20 @@ const GamePlay = () => {
                     <div className={`text-3xl font-bold ${timeRemaining <= 3 ? 'text-red-600' : 'text-purple-600'}`}>
                       {timeRemaining}s
                     </div>
+                    <button
+                      onClick={() => {
+                        if (confirm('게임을 나가시겠습니까?')) {
+                          reset();
+                          navigate('/');
+                        }
+                      }}
+                      className="p-2 text-gray-400 hover:text-red-500 transition-colors"
+                      title="나가기"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                      </svg>
+                    </button>
                   </div>
                 </div>
 
@@ -240,7 +258,13 @@ const GamePlay = () => {
                     ))}
                   </div>
                   <p className="text-center text-white mt-4 text-lg">
-                    Listen carefully...
+                    {hasReportedPlaybackError ? (
+                      <span className="text-yellow-200">
+                        Video playback error reported ({playbackErrorPercent}% of players affected)
+                      </span>
+                    ) : (
+                      'Listen carefully...'
+                    )}
                   </p>
                 </div>
 
@@ -253,6 +277,12 @@ const GamePlay = () => {
                       previewDuration={currentSong.previewDuration}
                       autoPlay={true}
                       volume={volume}
+                      onError={() => {
+                        // Report playback error to trigger auto-skip if enough players can't play
+                        if (roomId && !hasReportedPlaybackError) {
+                          reportPlaybackError(roomId);
+                        }
+                      }}
                     />
                   ) : (
                     <audio
