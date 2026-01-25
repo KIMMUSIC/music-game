@@ -22,72 +22,72 @@ jobs:
       matrix:
         include:
           - service: auth
-            ecr_repo: musicquiz-auth
-            ecs_service: musicquiz-auth-service
+            ecr_repo: musicquiz-dev-auth
+            ecs_service: musicquiz-dev-auth
           - service: quiz
-            ecr_repo: musicquiz-quiz
-            ecs_service: musicquiz-quiz-service
+            ecr_repo: musicquiz-dev-quiz
+            ecs_service: musicquiz-dev-quiz
           - service: game
-            ecr_repo: musicquiz-game
-            ecs_service: musicquiz-game-service
+            ecr_repo: musicquiz-dev-game
+            ecs_service: musicquiz-dev-game
           - service: social
-            ecr_repo: musicquiz-social
-            ecs_service: musicquiz-social-service
+            ecr_repo: musicquiz-dev-social
+            ecs_service: musicquiz-dev-social
           - service: frontend
-            ecr_repo: musicquiz-frontend
-            ecs_service: musicquiz-frontend-service
+            ecr_repo: musicquiz-dev-frontend
+            ecs_service: musicquiz-dev-frontend
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+       - name: Checkout code
+         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::149536471243:role/github-actions-musicquiz
-          aws-region: ${{ env.AWS_REGION }}
+       - name: Configure AWS credentials
+         uses: aws-actions/configure-aws-credentials@v4
+         with:
+           role-to-assume: arn:aws:iam::149536471243:role/github-actions-musicquiz
+           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
+       - name: Login to Amazon ECR
+         id: login-ecr
+         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+       - name: Set up Docker Buildx
+         uses: docker/setup-buildx-action@v3
 
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.service == 'frontend' && 'frontend/Dockerfile' || format('backend/services/{0}/Dockerfile', matrix.service) }}
-          push: true
-          tags: |
-            ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}
-            ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          build-args: |
-            VITE_API_URL=${{ secrets.FRONTEND_URL }}
-            VITE_GAME_SERVICE_URL=${{ secrets.GAME_SERVICE_URL }}
-            VITE_SOCIAL_SERVICE_URL=${{ secrets.SOCIAL_SERVICE_URL }}
+       - name: Build and push Docker image
+         uses: docker/build-push-action@v5
+         with:
+           context: .
+           file: ${{ matrix.service == 'frontend' && 'frontend/Dockerfile' || format('backend/services/{0}/Dockerfile', matrix.service) }}
+           push: true
+           tags: |
+             ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}
+             ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:latest
+           cache-from: type=gha
+           cache-to: type=gha,mode=max
+           build-args: |
+             VITE_API_URL=${{ secrets.FRONTEND_URL }}
+             VITE_GAME_SERVICE_URL=${{ secrets.GAME_SERVICE_URL }}
+             VITE_SOCIAL_SERVICE_URL=${{ secrets.SOCIAL_SERVICE_URL }}
 
-      - name: Download task definition
-        run: |
-          aws ecs describe-task-definition \
-            --task-definition musicquiz-${{ matrix.service }} \
-            --query taskDefinition > task-definition.json
+       - name: Download task definition
+         run: |
+           aws ecs describe-task-definition \
+             --task-definition musicquiz-dev-${{ matrix.service }} \
+             --query taskDefinition > task-definition.json
 
-      - name: Fill in the new image ID in the Amazon ECS task definition
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: task-definition.json
-          container-name: ${{ matrix.ecr_repo }}
-          image: ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}
+       - name: Fill in the new image ID in the Amazon ECS task definition
+         id: task-def
+         uses: aws-actions/amazon-ecs-render-task-definition@v1
+         with:
+           task-definition: task-definition.json
+           container-name: ${{ matrix.ecr_repo }}
+           image: ${{ env.ECR_REGISTRY }}/${{ matrix.ecr_repo }}:${{ github.sha }}
 
-      - name: Deploy Amazon ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ matrix.ecs_service }}
-          cluster: musicquiz-cluster
-          wait-for-service-stability: true
+       - name: Deploy Amazon ECS task definition
+         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+         with:
+           task-definition: ${{ steps.task-def.outputs.task-definition }}
+           service: ${{ matrix.ecs_service }}
+           cluster: musicquiz-dev
+           wait-for-service-stability: true

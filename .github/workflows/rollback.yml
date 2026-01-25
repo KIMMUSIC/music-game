@@ -1,0 +1,79 @@
+name: ECS Rollback
+
+on:
+  workflow_dispatch:
+    inputs:
+      aws_region:
+        description: "AWS region"
+        required: true
+        default: "ap-northeast-2"
+      cluster:
+        description: "ECS cluster name"
+        required: true
+      service:
+        description: "ECS service name"
+        required: true
+      task_definition_arn:
+        description: "Task definition ARN to roll back to (optional)"
+        required: false
+      task_definition_family:
+        description: "Task definition family (used if ARN not provided)"
+        required: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  rollback:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Show current task definition
+        run: |
+          aws ecs describe-services \
+            --cluster "${{ inputs.cluster }}" \
+            --services "${{ inputs.service }}" \
+            --query "services[0].taskDefinition" \
+            --output text
+
+      - name: Resolve rollback task definition
+        id: resolve
+        run: |
+          if [ -n "${{ inputs.task_definition_arn }}" ]; then
+            echo "task_definition=${{ inputs.task_definition_arn }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "${{ inputs.task_definition_family }}" ]; then
+            echo "task_definition_family is required if task_definition_arn is not provided" >&2
+            exit 1
+          fi
+
+          PREVIOUS=$(aws ecs list-task-definitions \
+            --family-prefix "${{ inputs.task_definition_family }}" \
+            --sort DESC \
+            --max-items 2 \
+            --query "taskDefinitionArns[1]" \
+            --output text)
+
+          if [ "$PREVIOUS" = "None" ] || [ -z "$PREVIOUS" ]; then
+            echo "No previous task definition found for family" >&2
+            exit 1
+          fi
+
+          echo "task_definition=$PREVIOUS" >> "$GITHUB_OUTPUT"
+
+      - name: Roll back ECS service
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.resolve.outputs.task_definition }}
+          service: ${{ inputs.service }}
+          cluster: ${{ inputs.cluster }}
+          wait-for-service-stability: true
